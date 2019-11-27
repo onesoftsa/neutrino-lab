@@ -1,0 +1,15 @@
+NEUTRINO_LAB:
+  Darwin: ../
+  Linux: ../
+  Windows: ../
+DATA_FOLDER:
+  Darwin: ../data/
+  Linux: ../data/
+  Windows: ../data/
+LOGS:
+  Darwin: ../
+  Linux: ../
+  Windows: ../
+ENV:
+  Prod: false
+  Verb: false
