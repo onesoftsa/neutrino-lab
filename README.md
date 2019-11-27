@@ -8,8 +8,8 @@ Neutrino Lab is a toolkit for developing and testing algorithmic trading strateg
 To set up your python environment to run the code in this repository, start by following [these](https://ideaorchard.wordpress.com/2015/01/16/installing-ta-lib-ubuntu/) instructions to install TA-Lib. Then, create a new environment with Anaconda and install the dependencies.
 
 ```shell
-$ conda create --name ngym36 python=3.6
-$ source activate ngym36
+$ conda create --name ngym27 python=2.7
+$ source activate ngym27
 $ pip install -r requirements.txt
 ```
 
