@@ -718,6 +718,12 @@ class IndicatorProperties(object):
     average = IndicatorAverage.SMA
 
 
+class BarProperties(object):
+    bar_count = None
+    interval = None
+    symbol = None
+
+
 class Symbol(object):
     def __init__(self, l_instrument):
         self.instruments = iter(l_instrument)
@@ -755,9 +761,10 @@ class CandleRegister(object):
         self._bar_data = {}
         self._selectors = {}
         self.b_ready = b_ready
-        self.symbol = None
-        self.interval = None
-        self.bar_count = None
+        self.properties = BarProperties()
+        self.properties.symbol = None
+        self.properties.interval = None
+        self.properties.bar_count = None
 
     def add_sma(self, bar_count, source):
         '''
@@ -782,24 +789,24 @@ class CandleRegister(object):
         obj_rtn.properties.source = source
         return obj_rtn
 
-    def add_satr(self, bar_count):
+    def add_satr(self, sa_bar_count):
         '''
 
-        bar_count: integer.
+        sa_bar_count: integer.
         '''
         self.b_ready = False
         if 'SATR' not in self._indicator_data:
             self._indicator_data['SATR'] = {}
-        s_alias = 'SATR_%i' % (bar_count)
+        s_alias = 'SATR_%i' % (sa_bar_count)
         ENV.candles.add_indicator_to(
             this_candle=self._bar_obj,
             s_alias=s_alias,
             s_ta_name='SATR',
-            i_time_period=bar_count)
+            i_time_period=sa_bar_count)
         obj_rtn = IndicatorRegister(self, s_alias)
         self._indicator_data['SATR'][s_alias] = obj_rtn
         obj_rtn.name = IndicatorName.SATR
-        obj_rtn.properties.bar_count = bar_count
+        obj_rtn.properties.sa_bar_count = sa_bar_count
         return obj_rtn
 
     def add_adx(self, bar_count):
@@ -2225,9 +2232,9 @@ class fx(object):
             i_nbars=bar_count,
             s_alias=s_alias)
         obj_candle.v3_obj = CandleRegister(obj_candle, False)
-        obj_candle.v3_obj.symbol = symbol
-        obj_candle.v3_obj.interval = interval
-        obj_candle.v3_obj.bar_count = bar_count
+        obj_candle.v3_obj.properties.symbol = symbol
+        obj_candle.v3_obj.properties.interval = interval
+        obj_candle.v3_obj.properties.bar_count = bar_count
         return obj_candle.v3_obj
 
     @staticmethod
