@@ -36,3 +36,7 @@ An example of the datasets used in this project can be found [here](https://www.
 
 ### Docs
 You can find a high-level documentation of the methods and functions of strategy API in Portuguese [here]().
+
+
+### License
+The contents of this repository are covered under the [Apache 2.0 License](LICENSE.md).
