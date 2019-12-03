@@ -18,6 +18,14 @@ BOVESPA = False
 CALLBACKS = {}
 
 
+class NoneObjectError(Exception):
+    """
+    NoneObjectError is raised by the BandRegister and IndicatorRegister object
+    after they are removed using remove_indicator() bar method
+    """
+    pass
+
+
 def init_pending_cbacks():
     return {
         'trade': [], 'book': [], 'other': [], 'candle': [], 'checked': False}
@@ -115,6 +123,13 @@ class UpdateReason(Enum):
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
+
 
 class TimeInForce(Enum):
     DAY = 0
@@ -130,6 +145,13 @@ class TimeInForce(Enum):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
 
 
 class FIXStatus(Enum):
@@ -152,6 +174,13 @@ class FIXStatus(Enum):
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
+
 
 class QuitReason(Enum):
     USER_QUIT = 0
@@ -169,6 +198,13 @@ class QuitReason(Enum):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
 
 
 # class CandleInterval(Enum):
@@ -211,6 +247,13 @@ class IndicatorSource(Enum):
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
+
 
 class NotificationEvent(Enum):
     POPUP = 0
@@ -224,6 +267,13 @@ class NotificationEvent(Enum):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
 
 
 class OrderType(Enum):
@@ -242,6 +292,13 @@ class OrderType(Enum):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
 
 
 class OrderStatus(Enum):
@@ -264,6 +321,13 @@ class OrderStatus(Enum):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
 
     def __or__(self, o):
         if isinstance(o, OrderStatus):
@@ -296,6 +360,13 @@ class OrderRetCode(Enum):
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
+
 
 class IndicatorAverage(Enum):
     SMA = 0
@@ -311,6 +382,13 @@ class IndicatorAverage(Enum):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
 
 
 class IndicatorName(Enum):
@@ -339,6 +417,13 @@ class IndicatorName(Enum):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        '''
+        Allow the Order object be used as a key in a hash table. It is used by
+        dictionaries
+        '''
+        return self.value.__hash__()
 
 
 QueueInfo = namedtuple('QueueInfo', 'quantity price')
@@ -611,16 +696,22 @@ class BandsRegister(object):
         self.i_inner_idx = i_inner_idx
         self.s_name = bar_obj._bar_obj._alias.get(s_alias, None)
         self.properties = IndicatorProperties()
+        self._removed = False
         self.bands = [
             IndicatorSelector(self, 0),
             IndicatorSelector(self, 1),
             IndicatorSelector(self, 2)]
 
     def remove_indicator(self):
-        ENV.candles.reset(this_candle=self.bar_obj._bar_obj)
+        self._removed = True
+        ENV.candles.reset(
+            this_candle=self.bar_obj._bar_obj,
+            this_conf=self._s_alias)
 
     @property
     def data(self):
+        if self._removed:
+            raise NoneObjectError
         # return self.bar_obj._bar_obj.d_candle_data[self.s_name]['data']
         if not self.bar_obj.b_ready:
             return []
@@ -628,6 +719,8 @@ class BandsRegister(object):
 
     @property
     def last_id(self):
+        if self._removed:
+            raise NoneObjectError
         if not self.bar_obj.b_ready:
             return 0
         i_len = len(self.bands[0])
@@ -643,6 +736,7 @@ class IndicatorRegister(object):
         self.bar_obj = bar_obj
         self._s_alias = s_alias
         self.i_inner_idx = i_inner_idx
+        self._removed = False
         self.s_name = bar_obj._bar_obj._alias.get(s_alias, None)
         self._conf = dict(zip(
             ['what', 'symbol', 'conf'], self.s_name.split(':')))
@@ -651,12 +745,15 @@ class IndicatorRegister(object):
 
     def remove_indicator(self):
         # NOTE: it is not working properly
+        self._removed = True
         ENV.candles.reset(
             this_candle=self.bar_obj._bar_obj,
             this_conf=self._conf)
 
     @property
     def data(self):
+        if self._removed:
+            raise NoneObjectError
         # return self.bar_obj._bar_obj.d_candle_data[self.s_name]['data']
         if not self.bar_obj.b_ready:
             return []
@@ -664,6 +761,8 @@ class IndicatorRegister(object):
 
     @property
     def last_id(self):
+        if self._removed:
+            raise NoneObjectError
         if not self.bar_obj.b_ready:
             return 0
         i_len = len(self.values)
@@ -1427,18 +1526,6 @@ class order_client(object):
         elif s_tests == '101':
             orders.cancel_orders_by_price(instr, s_side='BID', f_price=price)
             orders.cancel_orders_by_price(instr, s_side='ASK', f_price=price)
-
-
-_MAP_FIXSTATUS = {
-    FIXStatus.IDLE: OrderStatus.WAIT,
-    FIXStatus.PENDING: OrderStatus.WAIT,
-    FIXStatus.NEW: OrderStatus.ACTIVE,
-    FIXStatus.PARTIALLY_FILLED: OrderStatus.PARTIALLY_FILLED,
-    FIXStatus.FILLED: OrderStatus.FILLED,
-    FIXStatus.CANCELLED: OrderStatus.CANCELLED,
-    FIXStatus.REPLACED: OrderStatus.REPLACED,
-    FIXStatus.REJECTED: OrderStatus.REJECTED
-    }
 
 
 class LimitOrderEntry(object):

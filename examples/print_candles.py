@@ -131,9 +131,9 @@ def add_all_data(agent):
         10, 2, 2, neutrino.IndicatorAverage.SMA)
     agent.my_sabbands = agent.my_bar.add_sabbands(
         10, 2, 2, 10, neutrino.IndicatorAverage.SMA)
-    print(f'Candle(symbol={agent.my_bar.properties.symbol}, '
+    print(f'\n    Candle(symbol={agent.my_bar.properties.symbol}, '
           f'bar_count={agent.my_bar.properties.bar_count}, '
-          f'interval={agent.my_bar.properties.interval}) subscribed')
+          f'interval={agent.my_bar.properties.interval}) subscribed\n')
 
 '''
 End help functions
