@@ -186,7 +186,7 @@ def get_begin_time(fx_now, bar_count, bar_interval):
                              delimiter=',',
                              dtype=object,
                              skip_header=1,
-                             converters={0: lambda x: func(x, '%m/%d/%Y')})
+                             converters={0: lambda x: func(x.decode('utf-8'), '%m/%d/%Y')})
     i_total_session_bars = int(1 + (18-10)*60**2/bar_interval)
 
     dt_now = convert_time(fx_now)

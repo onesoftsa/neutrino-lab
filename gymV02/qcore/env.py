@@ -807,7 +807,7 @@ class Env(object):
             # if d_these_candles and not agent.b_has_bidSide:
             #     self.candles.check_pending_candles_subscriptions(int(fx.now()))
             if not agent.b_has_bidSide:
-                for s_name, inst_data in d_these_candles.iteritems():
+                for s_name, inst_data in iter(d_these_candles.items()):
                     this_candle = self.candles.get_candle(
                         None, s_instr, inst_data['INTERVAL'])
                     if not this_candle.v3_obj._bar_data:
@@ -815,7 +815,7 @@ class Env(object):
                         this_candle.v3_obj.b_ready = True
                 d_these_candles = {}
             # NOTE: I shold change the candle object to support multiple agents
-            for s_name, inst_data in d_these_candles.iteritems():
+            for s_name, inst_data in iter(d_these_candles.items()):
                 if d_update[s_name]:
                     d_data_subscribed = self.instr_data_subscribed[s_instr]
                     if inst_data['CANDLE_NAME'] in d_data_subscribed:
