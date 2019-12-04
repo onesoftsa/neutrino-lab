@@ -289,6 +289,7 @@ class Env(object):
         self.close_mkt_time = f2
 
         # check the file names
+        datafolder = datafolder.replace('\\', '/')  # windows stuff
         if datafolder[-1] != '/':
             datafolder += '/'
         l_files = []
