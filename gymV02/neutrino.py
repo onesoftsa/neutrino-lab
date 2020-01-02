@@ -1657,6 +1657,10 @@ class PositionData(object):
 
     @property
     def net(self):
+        if self.b_init:
+            i_pos = self.bid_quantity
+            i_pos -= self.ask_quantity
+            return i_pos
         return self._instr.get_position()
 
     @property
