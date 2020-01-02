@@ -115,12 +115,12 @@ def orderU2str(order_entry):
 def _process_check(agent, l_data, s_txt):
     s_cmd, s_id = l_data
     if s_id.isdigit():
-        order_entry = neutrino.order_client.get_order_by_id(int(s_id))
+        order_entry = neutrino.oms.get_order_by_id(int(s_id))
         order2str(order_entry, s_txt)
 
     elif 'price' == s_id[:5] and len(s_id) > 5:
         f_price = float(s_id[5:])
-        l_orderids = neutrino.order_client.get_live_orders(
+        l_orderids = neutrino.oms.get_live_orders(
             agent.my_symbol, price=f_price)
         if l_orderids:
             print(f'%s Find {len(l_orderids)} orders using price:' % s_txt)
@@ -131,7 +131,7 @@ def _process_check(agent, l_data, s_txt):
 
     elif 'side' == s_id[:4] and len(s_id) > 5:
         s_side = _MAP_SIDE[s_id[4:].lower()]
-        l_orderids = neutrino.order_client.get_live_orders(
+        l_orderids = neutrino.oms.get_live_orders(
             agent.my_symbol, side=s_side)
         if l_orderids:
             print(f'%s Find {len(l_orderids)} orders using side:' % s_txt)
@@ -144,15 +144,15 @@ def _process_check(agent, l_data, s_txt):
 def _process_where(agent, l_data, s_txt):
     s_cmd, s_id = l_data
     if s_id.isdigit():
-        order_entry = neutrino.order_client.get_order_by_id(int(s_id))
+        order_entry = neutrino.oms.get_order_by_id(int(s_id))
         if isinstance(order_entry, type(None)):
             print('%s fail to find order %s' % (s_txt, s_id))
             return
         instr = neutrino.market.get(order_entry.symbol)
         if str(order_entry.side) == 'BID':
-            l_ids = [x.order_id for x in instr.book.bid()]
+            l_ids = [x.order_id for x in instr.book.bid]
         else:
-            l_ids = [x.order_id for x in instr.book.ask()]
+            l_ids = [x.order_id for x in instr.book.ask]
         i_my_ii = -1
         for ii, order_id in enumerate(l_ids):
             if ((i_my_ii == -1) and
@@ -169,11 +169,11 @@ def _process_where(agent, l_data, s_txt):
 def _process_cancel(agent, l_data, s_txt):
     s_cmd, s_id = l_data
     if s_id.isdigit():
-        order_entry = neutrino.order_client.get_order_by_id(int(s_id))
+        order_entry = neutrino.oms.get_order_by_id(int(s_id))
         if isinstance(order_entry, type(None)):
             print('%s fail to find order %s' % (s_txt, s_id))
         if int(s_id) == 1:
-            i_id = neutrino.order_client.cancel(order_entry)
+            i_id = neutrino.oms.cancel(order_entry)
         elif int(s_id) > 1:
             i_id = order_entry.cancel()
         if i_id >= 0:
@@ -181,26 +181,26 @@ def _process_cancel(agent, l_data, s_txt):
         else:
             print('%s %s fail order %s(%i)' % (s_txt, s_cmd, s_id, i_id))
     elif 'all' == s_id:
-        l_orders = neutrino.order_client.cancel_all(agent.my_symbol)
+        l_orders = neutrino.oms.cancel_all(agent.my_symbol)
 
     elif 'price' == s_id[:5] and len(s_id) > 5:
         f_price = float(s_id[5:])
-        l_orders = neutrino.order_client.cancel_all(
+        l_orders = neutrino.oms.cancel_all(
             agent.my_symbol, price=f_price)
 
     elif 'side' == s_id[:4] and len(s_id) > 5:
         s_side = _MAP_SIDE[s_id[4:]]
-        l_orders = neutrino.order_client.cancel_all(
+        l_orders = neutrino.oms.cancel_all(
             agent.my_symbol, side=s_side)
 
 def _process_replace(agent, l_data, s_txt):
     s_cmd, s_id, s_price = l_data
     if s_id.isdigit() and s_price[0] == '@':
-        order_entry = neutrino.order_client.get_order_by_id(int(s_id))
+        order_entry = neutrino.oms.get_order_by_id(int(s_id))
         if isinstance(order_entry, type(None)):
             print('%s fail to find order %s' % (s_txt, s_id))
         if int(s_id) == 1:
-            i_id = neutrino.order_client.replace_limit_order(
+            i_id = neutrino.oms.replace_limit_order(
                 order_entry,
                 price=float(s_price[1:]),
                 quantity=order_entry.quantity + 5,
@@ -230,7 +230,7 @@ def process_raw_input(agent, s_txt):
         s_side, s_qty, s_price = l_data
         if s_qty.isdigit() and s_price[0] == '@':
             if s_price[1:].replace('.', '').isdigit():
-                i_id = neutrino.order_client.send_limit_order(
+                i_id = neutrino.oms.send_limit_order(
                     symbol=agent.my_symbol,
                     side=_MAP_SIDE[s_side],
                     price=float(s_price[1:]),
@@ -258,6 +258,10 @@ def process_raw_input(agent, s_txt):
     # replace orders
     if len(l_data) == 3 and l_data[0] == 'replace':
         _process_replace(agent, l_data, s_txt)
+
+    # pdb
+    if len(l_data) == 1 and l_data[0] == 'pdb':
+        import pdb; pdb.set_trace()
 
 
 
@@ -325,12 +329,18 @@ class SendOrders(object):
             neutrino.OrderStatus.ACTIVE | neutrino.OrderStatus.WAIT |
             neutrino.OrderStatus.WAIT_CANCEL |
             neutrino.OrderStatus.REPLACED |neutrino.OrderStatus.WAIT_REPLACE)
-        i_bids = neutrino.order_client.get_total_quantity(
-            self.my_symbol, _MAP_SIDE['BID'], obj_filter)
-        i_asks = neutrino.order_client.get_total_quantity(
-            self.my_symbol, _MAP_SIDE['ASK'], obj_filter)
+
+        i_bids = neutrino.oms.get_total_quantity(
+	    symbol=self.my_symbol,
+            side=neutrino.Side.BID,
+            status=obj_filter)
+        i_asks = neutrino.oms.get_total_quantity(
+            self.my_symbol,
+             _MAP_SIDE['ASK'],
+            obj_filter)
+
         print('  total on bid: %i, total on ask: %i' % (i_bids, i_asks))
-        position_status = neutrino.position_controller.get(self.my_symbol)
+        position_status = neutrino.position.get(self.my_symbol)
         print(position2str(position_status))
         # import pdb; pdb.set_trace()
 

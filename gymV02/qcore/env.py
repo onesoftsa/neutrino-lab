@@ -674,6 +674,7 @@ class Env(object):
         # TODO: I have to change these attributes and callbacks, but i will
         #    keep them for now
         this_agent = agent
+        i_stack = 100
         if not agent.b_has_bidSide:
             # old attr
             if hasattr(this_agent, 'agent'):
@@ -690,26 +691,24 @@ class Env(object):
                 self.orders[agent.i_id].logger = self.logger
                 self.orders[agent.i_id].set_owner(this_agent)
                 for s_symbol in self.l_instrument:
-                    i_stack = 100
                     this_instrument = Instrument(s_symbol, i_stack)
                     this_instrument.logger = self.logger
                     this_agent._instr_stack[s_symbol] = this_instrument
                     agent._instr_stack[s_symbol] = this_instrument
 
-
+        # keep the final position in memory
+        if agent.i_id not in self.d_trial_data['agents_positions']:
+            self.d_trial_data['agents_positions'][agent.i_id] = {}
+            d_aux = self.d_trial_data['agents_positions'][agent.i_id]
+            for s_asset in agent._instr_stack:
+                d_aux[s_asset] = {'qBid': 0, 'Bid': 0.,
+                                  'Ask': 0., 'qAsk': 0.}
+        # set the agent position
+        d_pos_memory = self.d_trial_data['agents_positions'][agent.i_id]
+        s_command = 'init_pos='
+        d_pos_to_set = {}
         # hold last position
         if hold_pos:
-            # keep the final position in memory
-            if agent.i_id not in self.d_trial_data['agents_positions']:
-                self.d_trial_data['agents_positions'][agent.i_id] = {}
-                d_aux = self.d_trial_data['agents_positions'][agent.i_id]
-                for s_asset in agent._instr_stack:
-                    d_aux[s_asset] = {'qBid': 0, 'Bid': 0.,
-                                      'Ask': 0., 'qAsk': 0.}
-            # set the agent position
-            d_pos_memory = self.d_trial_data['agents_positions'][agent.i_id]
-            s_command = 'init_pos='
-            d_pos_to_set = {}
             for s_asset in agent._instr_stack:
                 instr = agent._instr_stack[s_asset]
                 # keep what the agent already traded in memory
@@ -719,9 +718,16 @@ class Env(object):
                 # set the agent to the next episode
                 i_pos = instr.get_position()
                 if i_pos != 0:
-                    d_pos_to_set[s_asset] = {'Q': i_pos, 'P': 0.}
-            if d_pos_to_set:
-                s_command = json.dumps({'init_pos': d_pos_to_set})
+                    f_price = instr.get_opened_price()
+                    d_pos_to_set[s_asset] = {'Q': i_pos, 'P': f_price}
+        if d_pos_to_set:
+            s_command = json.dumps({'init_pos': d_pos_to_set})
+
+        # reload instruments
+        for s_symbol in self.l_instrument:
+            this_instrument = Instrument(s_symbol, i_stack)
+            this_agent._instr_stack[s_symbol] = this_instrument
+            agent._instr_stack[s_symbol] = this_instrument
 
         # reset the agent-state variables
         if agent.b_has_bidSide:
@@ -729,11 +735,11 @@ class Env(object):
         else:
             # set initial position before initilize
             # NOTE: correct that to let set a initial position form config
-            # if s_command != 'init_pos=':
-            #     for s_asset in d_pos_to_set:
-            #         instr = agent._instr_stack[s_asset]
-            #         instr.set_initial_positions(
-            #             this_agent, d_pos_to_set[s_asset])
+            if s_command != 'init_pos=':
+                for s_asset in d_pos_to_set:
+                    instr = agent._instr_stack[s_asset]
+                    instr.set_initial_positions(
+                        this_agent, d_pos_to_set[s_asset])
             # initialize agent
             agent.initialize(Symbol(self.l_instrument))
 

@@ -250,6 +250,16 @@ class Instrument(object):
             i_pos -= self._init_pos['qAsk']
         return i_pos
 
+    def get_opened_price(self):
+        i_pos = self.get_position()
+        if abs(i_pos) < 1e-6:
+            return None
+        s_side = 'BID' if i_pos > 0 else 'ASK'
+        i_pos = abs(i_pos)
+
+        f_volume = sum([q*p for q, p in self._open_pos[s_side]])
+        return f_volume/i_pos
+
     def set_initial_positions(self, agent, d_position):
         '''
         Set the initial position of this instrument
@@ -277,10 +287,10 @@ class Instrument(object):
                 f_volume = float(d_position['P']) * abs(i_qty)
                 self._init_pos['Ask'] = 0
                 self._init_pos['Bid'] = f_volume
-        if i_qty != 0:
-            s_msg = self.logger['position']
-            s_msg = s_msg.format(self.symbol_name, d_position)
-            print(s_msg)
+        # if i_qty != 0:
+        #     s_msg = agent.logger['position']
+        #     s_msg = s_msg.format(self.symbol_name, d_position)
+        #     print(s_msg)
 
     def update_position(self, order, f_lastpx, f_lastqty):
         '''

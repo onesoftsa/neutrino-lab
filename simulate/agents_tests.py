@@ -214,7 +214,8 @@ def setup_simulation(agent, l_instrconf=None, i_id=None, brain=None):
 def test_agent(MyAgent, env, s_root, s_log, i_episodes=5, s_init='20180501',
                s_end='20180503', l_commands=[], l_setparams=[],
                l_instruments=[], b_just_once=True, s_file=None, b_plot=True,
-               b_save=True, b_block=False, f_milis=100., b_randstart=True):
+               b_save=True, b_block=False, f_milis=100., b_randstart=True,
+               s_starttime='09:30:00', s_endtime='15:30:00'):
     # start an environment and an agent
     agent = MyAgent()
     if l_instruments:
@@ -229,8 +230,8 @@ def test_agent(MyAgent, env, s_root, s_log, i_episodes=5, s_init='20180501',
     episodes_info = env.setParameters(init=s_init,
                                       end=s_end,
                                       datafolder=s_root,
-                                      starttime='09:30:00',
-                                      endtime='15:30:00',
+                                      starttime=s_starttime,
+                                      endtime=s_endtime,
                                       logfolder=s_log,
                                       instruments=l_instruments,
                                       f_milis=f_milis,

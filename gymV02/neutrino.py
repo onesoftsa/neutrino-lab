@@ -1404,7 +1404,7 @@ class Book(object):
         return s
 
 
-class order_client(object):
+class oms_client(object):
     _ready = False
     _id_mapping = {}
 
@@ -1426,9 +1426,9 @@ class order_client(object):
         # s_tif = orders._tif2str[time_in_force]
         i_order_id = orders.new_order(
             instr=instr, s_side=str(side), f_price=price, i_qty=quantity)
-        if i_id not in order_client._id_mapping:
-            order_client._id_mapping[i_id] = {}
-        order_client._id_mapping[i_id][i_order_id] = symbol
+        if i_id not in oms_client._id_mapping:
+            oms_client._id_mapping[i_id] = {}
+        oms_client._id_mapping[i_id][i_order_id] = symbol
         return i_order_id
 
     @staticmethod
@@ -1439,7 +1439,7 @@ class order_client(object):
         # s_tif = orders._tif2str[time_in_force]
         i_order_id = orders.modify_order(
             order=order.order, f_price=price, i_qty=quantity, s_tif='day')
-        order_client._id_mapping[i_id][i_order_id] = order.symbol
+        oms_client._id_mapping[i_id][i_order_id] = order.symbol
         return i_order_id
 
     @staticmethod
@@ -1447,9 +1447,9 @@ class order_client(object):
         '''
         '''
         orders = ENV.orders[i_id]
-        if i_id not in order_client._id_mapping:
+        if i_id not in oms_client._id_mapping:
             return None
-        symbol = order_client._id_mapping[i_id].get(order_id, None)
+        symbol = oms_client._id_mapping[i_id].get(order_id, None)
         if not symbol:
             return None
         instr = orders.get_instrument_from(s_symbol=symbol)
@@ -1486,7 +1486,7 @@ class order_client(object):
             l_bids = instr.get_my_orders_by_side('BID')
             l_asks = instr.get_my_orders_by_side('ASK')
             l_rtn = list(l_bids) + list(l_asks)
-        l_rtn = [order_client.get_order_by_id(x) for x in l_rtn]
+        l_rtn = [oms_client.get_order_by_id(x) for x in l_rtn]
 
         return l_rtn
 
@@ -1495,7 +1495,7 @@ class order_client(object):
         '''
         '''
         # NOTE: currently there is not option to get a list of older orders
-        return order_client.get_live_orders(
+        return oms_client.get_live_orders(
             symbol, side=side, price=price, i_id=i_id)
 
     @staticmethod
@@ -1652,8 +1652,8 @@ class LimitOrderEntry(object):
 class PositionData(object):
     def __init__(self, instrument, b_partial=False, b_init=False):
         self._instr = instrument
-        self.b_partial = False
-        self.b_init = False
+        self.b_partial = b_partial
+        self.b_init = b_init
 
     @property
     def net(self):
@@ -1726,7 +1726,7 @@ class PositionStatus(object):
         self.initial = PositionData(intrument, b_init=True)
 
 
-class position_controller(object):
+class position(object):
 
     @staticmethod
     def get(symbol, i_id=11):
@@ -1737,46 +1737,46 @@ class position_controller(object):
         return PositionStatus(instr)
 
 
-class order(object):
+class oms(object):
 
     @staticmethod
     def send_limit_order(
             symbol, side, price, quantity, time_in_force, i_id=11):
-        return order_client.send_limit_order(
+        return oms_client.send_limit_order(
             symbol=symbol, side=side, price=price, quantity=quantity,
             time_in_force=time_in_force, i_id=i_id)
     @staticmethod
     def replace_limit_order(
         order_entry, price, quantity, time_in_force, i_id=11):
-        return order_client.replace_limit_order(
+        return oms_client.replace_limit_order(
             order=order_entry, price=price, quantity=quantity,
             time_in_force=time_in_force, i_id=i_id)
 
     @staticmethod
     def get_order_by_id(order_id, i_id=11):
-        return order_client.get_order_by_id(order_id=order_id, i_id=i_id)
+        return oms_client.get_order_by_id(order_id=order_id, i_id=i_id)
 
     @staticmethod
-    def get_total_quantity(symbol, side, i_id=11):
-        return order_client.get_total_quantity(
+    def get_total_quantity(symbol, side, status=None, i_id=11):
+        return oms_client.get_total_quantity(
             symbol=symbol, side=side, i_id=i_id)
 
     @staticmethod
     def get_live_orders(symbol, side=None, price=None, i_id=11):
-        return order_client.get_live_orders(
+        return oms_client.get_live_orders(
             symbol=symbol, side=side, price=price, i_id=i_id)
     @staticmethod
     def get_all_orders(symbol, side=None, price=None, i_id=11):
-        return order_client.get_all_orders(
+        return oms_client.get_all_orders(
             symbol=symbol, side=side, price=price, i_id=i_id)
 
     @staticmethod
     def cancel(order_entry):
-        return order_client.cancel(order_entry)
+        return oms_client.cancel(order_entry)
 
     @staticmethod
     def cancel_all(symbol=None, side=None, price=None, i_id=11):
-        return order_client.cancel_all(
+        return oms_client.cancel_all(
             symbol=symbol, side=side, price=price, i_id=i_id)
 
 

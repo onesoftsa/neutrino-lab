@@ -118,7 +118,7 @@ class NotifyTest(object):
             if this_position.initial.net > 0:
                 this_side = neutrino.Side.ASK
                 this_price=this_instr.book.bid[0].price
-            i_id = neutrino.order_client.send_limit_order(
+            i_id = neutrino.oms.send_limit_order(
                 symbol=update.symbol,
                 side=this_side,
                 time_in_force=neutrino.TimeInForce.DAY,
