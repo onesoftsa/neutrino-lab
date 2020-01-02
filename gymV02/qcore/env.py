@@ -188,6 +188,7 @@ class Env(object):
         Initialize an Env object
         '''
         self.done = False
+        self.almost_done = False
         self.t = 0
         self._agent_sha = ''
         self.last_observation = Observation()
@@ -608,6 +609,7 @@ class Env(object):
         of each agent and return the fist observation form the environment
         '''
         self.done = False
+        self.almost_done = False
         self.train_mode = train_mode
         self.t = 0
         self.instr_data = {}
@@ -1012,9 +1014,18 @@ class Env(object):
         # check if the market is closed
         self.t += 1
         d_info = {}
+        self.almost_done
+        b_timetest = self.order_matching.last_date >= self.close_mkt_time-60
+        if not self.almost_done and b_timetest:
+            self.almost_done = True
+            for i_id in self.agents_actions:
+                this_agent = self.agents_actions[i_id].owner
+                if hasattr(this_agent, 'agent'):
+                    this_agent = this_agent.agent
+                this_agent.finalize(neutrino.QuitReason.ALGOMAN_QUIT)
         if self.order_matching.last_date >= self.close_mkt_time:
             self.done = True
-            s_msg = 'Environment.step(): Market closed at {}!'
+            s_msg = '[step]Environment: Market closed at {}!'
             s_msg += ' The session ended.'
             logging.info(s_msg.format(self.order_matching.s_time))
             d_info = {'total_steps': self.t}
