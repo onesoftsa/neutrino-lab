@@ -49,6 +49,7 @@ def translate_trades(row, my_book):
                                                         reverse=False)
     # recover the price levels of interest
     b_stop = False
+    b_neutrino_order = False
     if not gen_bk:
         return None
     l_msg_debug = []
@@ -100,6 +101,7 @@ def translate_trades(row, my_book):
                     continue
                 # end debug
                 if 'neutrino_order' in d_compare:
+                    b_neutrino_order = True
                     order = d_compare['neutrino_order']
                     order.status = neutrino.FIXStatus.PENDING
                     order.current.status = neutrino.FIXStatus.FILLED
@@ -112,7 +114,7 @@ def translate_trades(row, my_book):
         if b_stop:
             break
         if not my_book.b_secure_changes:
-            if not b_stop:
+            if not b_stop and not b_neutrino_order:
                 return [row]
     l_msg.append(row)
     # === DEBUG ===
