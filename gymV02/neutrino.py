@@ -1529,6 +1529,17 @@ class oms_client(object):
 
 
 class LimitOrderEntry(object):
+
+    _status_mapping = {
+        FIXStatus.IDLE: OrderStatus.WAIT,
+        FIXStatus.PENDING: OrderStatus.WAIT,
+        FIXStatus.NEW: OrderStatus.ACTIVE,
+        FIXStatus.PARTIALLY_FILLED: OrderStatus.PARTIALLY_FILLED,
+        FIXStatus.FILLED: OrderStatus.FILLED,
+        FIXStatus.CANCELLED: OrderStatus.CANCELLED,
+        FIXStatus.REPLACED: OrderStatus.REPLACED,
+        FIXStatus.REJECTED: OrderStatus.REJECTED}
+
     def __init__(self, order, i_id):
         self.order = order
         self.i_id = i_id
@@ -1567,8 +1578,8 @@ class LimitOrderEntry(object):
     @property
     def status(self):
         if self.order.current and self.order.current.status:
-            return self.order.current.status
-        return self.order.next.status
+            return self._status_mapping[self.order.current.status]
+        return self._status_mapping[self.order.next.status]
 
     @property
     def price(self):
