@@ -207,17 +207,118 @@ def setup_simulation(agent, l_instrconf=None, i_id=None, brain=None):
         return
     agent.i_id = i_id
     agent._instr_from_conf = l_instrconf
+    # other variables
+    if not hasattr(agent, '_disable_bid'):
+        agent._disable_bid = True
+        agent._disable_ask = True
+        agent._done = False
+        agent._last_setoffline = 0
+        agent._msg_offline = ''
     # set RL agents parameters
     agent.brain = brain
 
 
-def test_agent(MyAgent, env, s_root, s_log, i_episodes=5, s_init='20180501',
-               s_end='20180503', l_commands=[], l_setparams=[],
-               l_instruments=[], b_just_once=True, s_file=None, b_plot=True,
-               b_save=True, b_block=False, f_milis=100., b_randstart=True,
-               s_starttime='09:30:00', s_endtime='15:30:00'):
-    # start an environment and an agent
-    agent = MyAgent()
+def _print_header(env, i_episode, i_episodes):
+    if i_episode == 0:
+        print('\n###########################################')
+        print('Start simulation of %i episode(s)' % i_episodes)
+        print(' > gym version: %s' % neutrinogym.algos.__version__)
+        s_sha = get_current_sha()
+        if s_sha:
+            env.agent_sha = s_sha
+            print(' > repo hex: %s' % s_sha)
+        return
+    print('\n###########################################\n')
+
+
+def _set_agent_params(env, agent, i_episode, kwargs):
+    # recover variables
+    l_setparams = kwargs.get('l_setparams', [])
+    l_commands = kwargs.get('l_commands', [])
+    b_just_once = kwargs.get('b_just_once', True)
+    l_setparams2 = [json.dumps(x) for x in l_setparams]
+
+    # setup agent params
+    if b_just_once and i_episode == 0:
+        env.set_agent_params(agent, 'command', l_commands)
+        env.set_agent_params(agent, 'parameters', l_setparams2)
+    elif not b_just_once:
+        env.set_agent_params(agent, 'command', l_commands)
+        env.set_agent_params(agent, 'parameters', l_setparams2)
+
+    # print current parameters
+    print('get_parameters output:')
+    env.get_agent_params(agent)
+    pprint.pprint(json.loads(env.get_agent_params(agent)))
+    print('\n')
+
+
+def _setup_plot_data(b_plot):
+    d_rtn = {}
+    if b_plot:
+        plt.style.use('ggplot')
+        f, ax = plt.subplots(1, 1)
+        ax.set_title('Live PnL', fontsize=16)
+        ax.set_ylabel('PnL')
+        ax.set_xlabel('timeidx')
+        obj_line = Line2D([], [], color='#1dcaff')
+        _ = ax.add_line(obj_line)
+        f.show()
+        d_rtn = {
+            'fig': f,
+            'ax': ax,
+            'obj_line': obj_line,
+        }
+    return d_rtn
+
+
+def _save_simulation_data(env, kwargs):
+    s_file = kwargs.get('s_file', None)
+    s_log = kwargs.get('s_log', '')
+    if s_file:
+        print('Saving results at {}'.format(s_log + 'log/' + s_file))
+        df = pd.DataFrame(env.d_trial_data['hist_pnl'][11])
+        df.to_hdf(s_log + 'log/' + s_file, 'w')
+
+
+def _update_plot_data(env, plot_data, b_plot, kwargs, b_end=False):
+    b_save = kwargs.get('b_save', True)
+    b_block = kwargs.get('b_block', False)
+    # plot PnL, if required
+    if b_plot and env._new_infos:
+        env._new_infos = False
+        df = pd.DataFrame(env.d_trial_data['hist_pnl'][11])
+        plot_data['obj_line'].set_data(df.index, df.pnl.values)
+        plot_data['ax'].relim()
+        plot_data['ax'].autoscale_view()
+        mypause(0.1)
+
+    if not b_end:
+        return
+
+    if b_plot and b_save:
+        s_log = kwargs.get('s_log', False)
+        plot_data['fig'].savefig(s_log + 'log/last_plot.svg', format='svg')
+
+    if b_plot and b_block:
+        plt.show(block=True)
+
+
+def _setup_simulation(agent_class, agent_wrapper, env, kwargs):
+    # recover variables
+    l_instruments = kwargs.get('l_instruments', [])
+    f_milis = kwargs.get('f_milis', 100.)
+    s_root = kwargs.get('s_root', '')
+    s_log = kwargs.get('s_log', '')
+    i_episodes = kwargs.get('i_episodes', None)
+    b_randstart = kwargs.get('b_randstart', True)
+    s_starttime = kwargs.get('s_starttime', '09:30:00')
+    s_endtime = kwargs.get('s_endtime', '15:30:00')
+    s_init = kwargs.get('s_init', '20180501')
+    s_end = kwargs.get('s_end', '20180503')
+
+    # setup the agent
+    agent = agent_class()
     if l_instruments:
         i_id = getattr(agent, 'i_id', 11)
         brain = getattr(agent, 'brain', None)
@@ -226,7 +327,7 @@ def test_agent(MyAgent, env, s_root, s_log, i_episodes=5, s_init='20180501',
     l_instruments = agent._instr_from_conf
     agent = MyMonitor(agent)
 
-    # set dates. Make sure that the `neutrinogym.conf` file is set
+    # setup the environment
     episodes_info = env.setParameters(init=s_init,
                                       end=s_end,
                                       datafolder=s_root,
@@ -237,60 +338,54 @@ def test_agent(MyAgent, env, s_root, s_log, i_episodes=5, s_init='20180501',
                                       f_milis=f_milis,
                                       b_randstart=b_randstart)
 
-    # run a simulation using all order book order book data
+
+
     if isinstance(i_episodes, type(None)):
         i_episodes = episodes_info.total
-    print('\n###########################################')
-    print('Start simulation of %i episode(s)' % i_episodes)
-    print(' > gym version: %s' % neutrinogym.algos.__version__)
-    s_sha = get_current_sha()
-    if s_sha:
-        env.agent_sha = s_sha
-        print(' > repo hex: %s' % s_sha)
 
-    if b_plot:
-        plt.style.use('ggplot')
-        f, ax = plt.subplots(1, 1)
-        ax.set_title('Live PnL', fontsize=16)
-        ax.set_ylabel('PnL')
-        ax.set_xlabel('timeidx')
-        obj_line = Line2D([], [], color='#1dcaff')
-        _ = ax.add_line(obj_line)
-        f.show()
+    d_rtn = {
+        'episodes_info': episodes_info,
+        'i_episodes': i_episodes,
+        'agent': agent,
+        'l_instruments': l_instruments}
 
+    return d_rtn
+
+
+def test_agent(MyAgent, env, **kwargs):
+
+    # setup the agent and the environment
+    d_setup = _setup_simulation(MyAgent, MyMonitor, env, kwargs)
+    episodes_info = d_setup.get('episodes_info')
+    agent = d_setup.get('agent')
+    i_episodes = d_setup.get('i_episodes')
+    b_plot = kwargs.get('b_plot', True)
+
+    # setup chart, if required
+    plot_data = _setup_plot_data(b_plot)
+
+    # run a simulation using all order book data
+
+    _print_header(env, 0, i_episodes)
     for i_episode in tqdm(range(i_episodes)):
-        print('\n###########################################\n')
+        # print the header of the simulation
+        _print_header(env, 1, i_episodes)
+
+        # reset environemnt
         observation = env.reset()
         env.resetAgent(agent, hold_pos=True)
 
         # correct parameters and dump them
-        l_setparams2 = [json.dumps(x) for x in l_setparams]
+        _set_agent_params(env, agent, i_episode, kwargs)
 
-        if b_just_once and i_episode == 0:
-            env.set_agent_params(agent, 'command', l_commands)
-            env.set_agent_params(agent, 'parameters', l_setparams2)
-        elif not b_just_once:
-            env.set_agent_params(agent, 'command', l_commands)
-            env.set_agent_params(agent, 'parameters', l_setparams2)
-
-        # print current parameters
-        print('processGetParameters output:')
-        env.get_agent_params(agent)
-        pprint.pprint(json.loads(env.get_agent_params(agent)))
-        print('\n')
-
+        # start simulating this episode
         while True:
             agent.render()
             actions = env.callBack(agent, observation)
             observation, reward, done, info = env.step(actions)
-            # plot PnL
-            if b_plot and env._new_infos:
-                env._new_infos = False
-                df = pd.DataFrame(env.d_trial_data['hist_pnl'][11])
-                obj_line.set_data(df.index, df.pnl.values)
-                ax.relim()
-                ax.autoscale_view()
-                mypause(0.1)
+
+            # plot PnL, if required
+            _update_plot_data(env, plot_data, b_plot, kwargs)
 
             # check if the environment is done
             if done:
@@ -302,15 +397,9 @@ def test_agent(MyAgent, env, s_root, s_log, i_episodes=5, s_init='20180501',
                 print(s_msg)
                 break
 
-    if s_file:
-        print('Saving results at {}'.format(s_log + 'log/' + s_file))
-        df = pd.DataFrame(env.d_trial_data['hist_pnl'][11])
-        df.to_hdf(s_log + 'log/' + s_file, 'w')
+    _save_simulation_data(env, kwargs)
 
     env.close()
     print('###########################################\n')
-    if b_plot and b_save:
-        f.savefig(s_log + 'log/last_plot.svg', format='svg')
-    if b_plot and b_block:
-        plt.show(block=True)
+    _update_plot_data(env, plot_data, b_plot, kwargs, True)
     return env, agent, episodes_info

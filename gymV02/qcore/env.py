@@ -616,6 +616,7 @@ class Env(object):
         self.instr_data_subscribed = {}
         self.order_matching.reset()
         self.reset_generator()
+        neutrino.fx.initial_time = 0  # Hack
 
         # NOTE: it is ugly, but reset the order_matching idx. Should reviwe it
         self.order_matching.s_file
@@ -746,7 +747,7 @@ class Env(object):
             agent.initialize(Symbol(self.l_instrument))
 
         if hasattr(agent, 'agent'):
-            agent._instr = list(fx.symbols_callbacks[agent.i_id])
+            agent._instr = list(fx.symbols_callbacks.get(agent.i_id, []))
 
         if not hasattr(this_agent, 'command'):
             return
@@ -1022,7 +1023,8 @@ class Env(object):
                 this_agent = self.agents_actions[i_id].owner
                 if hasattr(this_agent, 'agent'):
                     this_agent = this_agent.agent
-                this_agent.finalize(neutrino.QuitReason.ALGOMAN_QUIT)
+                if hasattr(this_agent, 'finalize'):
+                    this_agent.finalize(neutrino.QuitReason.ALGOMAN_QUIT)
         if self.order_matching.last_date >= self.close_mkt_time:
             self.done = True
             s_msg = '[step]Environment: Market closed at {}!'

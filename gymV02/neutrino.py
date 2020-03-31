@@ -82,6 +82,9 @@ class Side(Enum):
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        return self.value.__hash__()
+
 
 class Source(Enum):
     IDLE = 0
@@ -307,7 +310,7 @@ class OrderStatus(Enum):
     WAIT_CANCEL = 2
     ACTIVE = 3
     REPLACED = 4
-    PARTIALLY_FILLED = 5
+    PARTIAL_FILLED = 5
     FILLED = 6
     CANCELLED = 7
     REJECTED = 8
@@ -340,7 +343,6 @@ class OrderStatus(Enum):
             return self.value | o.value
         elif isinstance(o, int):
             return self.value | o
-
 
 
 class OrderRetCode(Enum):
@@ -1405,6 +1407,7 @@ class Book(object):
 
 
 class oms_client(object):
+
     _ready = False
     _id_mapping = {}
 
@@ -1534,7 +1537,7 @@ class LimitOrderEntry(object):
         FIXStatus.IDLE: OrderStatus.WAIT,
         FIXStatus.PENDING: OrderStatus.WAIT,
         FIXStatus.NEW: OrderStatus.ACTIVE,
-        FIXStatus.PARTIALLY_FILLED: OrderStatus.PARTIALLY_FILLED,
+        FIXStatus.PARTIALLY_FILLED: OrderStatus.PARTIAL_FILLED,
         FIXStatus.FILLED: OrderStatus.FILLED,
         FIXStatus.CANCELLED: OrderStatus.CANCELLED,
         FIXStatus.REPLACED: OrderStatus.REPLACED,
@@ -1629,8 +1632,11 @@ class LimitOrderEntry(object):
         orders.cancel_order(self.order)
         return self.unique_id
 
-    def replace_limit(self, price, quantity, time_in_force):
+    def replace(self, price, quantity, time_in_force):
+        return self.replace_limit(self, price, quantity, time_in_force)
 
+    def replace_limit(self, price, quantity, time_in_force):
+        # DEPRECTED
         orders = ENV.orders[self.i_id]
         # NOTE: tif in simulation is always the same
         # s_tif = orders._tif2str[time_in_force]
@@ -1753,6 +1759,24 @@ class position(object):
 
 
 class oms(object):
+    '''
+    Handle orders and keep all trasations related to them
+
+    Methods to create and manupulate orders:
+    - send_limit_order: TODO
+    - replace_limit_order: TODO
+    - cancel: TODO
+    - cancel_all: TODO
+
+    Methods to check orders already sent:
+    - get_orders(<symbol>="", <side>=NONE_SIDE, <price>=-1)
+    - get_live_orders(<symbol>="", <side>=NONE_SIDE, <price>=-1)
+    - get_total_quantity(<symbol>, <side>, <tatus_combination>=0)
+    - get_order_by_id(<unique_id>)
+
+    TODO
+
+    '''
 
     @staticmethod
     def send_limit_order(
@@ -1760,9 +1784,9 @@ class oms(object):
         return oms_client.send_limit_order(
             symbol=symbol, side=side, price=price, quantity=quantity,
             time_in_force=time_in_force, i_id=i_id)
+
     @staticmethod
-    def replace_limit_order(
-        order_entry, price, quantity, time_in_force, i_id=11):
+    def replace(order_entry, price, quantity, time_in_force, i_id=11):
         return oms_client.replace_limit_order(
             order=order_entry, price=price, quantity=quantity,
             time_in_force=time_in_force, i_id=i_id)
@@ -1780,6 +1804,7 @@ class oms(object):
     def get_live_orders(symbol, side=None, price=None, i_id=11):
         return oms_client.get_live_orders(
             symbol=symbol, side=side, price=price, i_id=i_id)
+
     @staticmethod
     def get_all_orders(symbol, side=None, price=None, i_id=11):
         return oms_client.get_all_orders(

@@ -1,16 +1,20 @@
 #!/usr/bin/python
 # -*- coding: future_fstrings -*-
 """
-Implement a strategy to test the new order API in production Environment
+...
 
+
+commands:
+set TestNotify max_position {"WDOH20":{"limit":3,"type_limit":"quantity"}} open_pos {"bid":true,"ask":true,"spread":10}
 
 @author: ucaiado
 
-Created on 11/04/2019
+Created on 11/21/2019
 """
 from __future__ import print_function
 import sys
 import time
+import json
 import neutrinogym.neutrino as neutrino
 
 '''
@@ -25,7 +29,6 @@ _MAP_SIDE = {
     'bid': neutrino.Side.BID, 'ask': neutrino.Side.ASK,
     'BID': neutrino.Side.BID, 'ASK': neutrino.Side.ASK}
 
-
 def epoch2str(epoch):
     # from Fredy
     mlsec = "000"
@@ -34,12 +37,9 @@ def epoch2str(epoch):
     return time.strftime(
         '[%Y-%m-%d %H:%M:%S.{}]'.format(mlsec), time.localtime(epoch))
 
-def foo(update):
-    print('foo')  #, flush=True)
 
 def book2str(agent, i_seq):
-    bid = neutrino.utils.by_price(
-        side=agent.instr[agent.my_symbol].book.bid, depth=5)
+    bid = neutrino.utils.by_price(agent.instr[agent.my_symbol].book.bid, 5)
     ask = neutrino.utils.by_price(agent.instr[agent.my_symbol].book.ask, 5)
     s_book_msg = (
         '\n%son_data: book_seq=%i, qbid=%.0f, bid=%.2f, ' +
@@ -98,16 +98,18 @@ def position2str(position_status):
 
     return s_rtn
 
+
 def orderU2str(order_entry):
     if isinstance(order_entry, type(None)):
         print('%s fail to find order %s' % (s_txt, s_id))
         return
-    return(
+    return (
         f'order({order_entry.unique_id}): ' +
         f'symbol={order_entry.symbol},' +
         f'side={order_entry.side},' +
         f'secondary_order_id={order_entry.secondary_order_id},' +
         f'status={order_entry.status},' +
+        f'last_price={order_entry.last_price},' +
         f'price={order_entry.price},' +
         f'qty={order_entry.quantity}')
 
@@ -150,9 +152,9 @@ def _process_where(agent, l_data, s_txt):
             return
         instr = neutrino.market.get(order_entry.symbol)
         if str(order_entry.side) == 'BID':
-            l_ids = [x.order_id for x in instr.book.bid]
+            l_ids = [x.order_id for x in instr.book.bid()]
         else:
-            l_ids = [x.order_id for x in instr.book.ask]
+            l_ids = [x.order_id for x in instr.book.ask()]
         i_my_ii = -1
         for ii, order_id in enumerate(l_ids):
             if ((i_my_ii == -1) and
@@ -163,8 +165,6 @@ def _process_where(agent, l_data, s_txt):
             f'is in position {i_my_ii}. The min ID in the book ' +
             f'is {min(l_ids)} and the order_entry secid type ' +
             f'is {type(order_entry.secondary_order_id)}')
-        return
-
 
 def _process_cancel(agent, l_data, s_txt):
     s_cmd, s_id = l_data
@@ -181,12 +181,14 @@ def _process_cancel(agent, l_data, s_txt):
         else:
             print('%s %s fail order %s(%i)' % (s_txt, s_cmd, s_id, i_id))
     elif 'all' == s_id:
-        l_orders = neutrino.oms.cancel_all(symbol=agent.my_symbol)
+        l_orders = neutrino.oms.cancel_all()
+        import pdb; pdb.set_trace()
 
     elif 'price' == s_id[:5] and len(s_id) > 5:
         f_price = float(s_id[5:])
         l_orders = neutrino.oms.cancel_all(
             agent.my_symbol, price=f_price)
+        import pdb; pdb.set_trace()
 
     elif 'side' == s_id[:4] and len(s_id) > 5:
         s_side = _MAP_SIDE[s_id[4:]]
@@ -201,19 +203,26 @@ def _process_replace(agent, l_data, s_txt):
             print('%s fail to find order %s' % (s_txt, s_id))
         if int(s_id) == 1:
             i_id = neutrino.oms.replace_limit_order(
+                # order_entry,
+                # float(s_price[1:]),
+                # order_entry.quantity,
+                # order_entry.time_in_force)
                 order_entry,
                 price=float(s_price[1:]),
-                quantity=order_entry.quantity - 5,
+                quantity=order_entry.quantity,
                 time_in_force=order_entry.time_in_force)
         elif int(s_id) > 1:
             i_id = order_entry.replace_limit(
+                # float(s_price[1:]),
+                # order_entry.quantity,
+                # order_entry.time_in_force)
                 price=float(s_price[1:]),
                 quantity=order_entry.quantity,
                 time_in_force=order_entry.time_in_force)
         if i_id >= 0:
             print('%s %s order %s(%i)' % (s_txt, s_cmd, s_id, i_id))
         else:
-            print('%s %s order %s failed: status (%i)' % (s_txt, s_cmd, s_id, i_id))
+            print('%s %s fail order %s(%i)' % (s_txt, s_cmd, s_id, i_id))
 
 
 def process_raw_input(agent, s_txt):
@@ -228,30 +237,19 @@ def process_raw_input(agent, s_txt):
     # send a new order
     if len(l_data) == 3 and l_data[0] in ['buy', 'sell']:
         s_side, s_qty, s_price = l_data
-        s_msg = '%s %s %s of something at %s using order %i. Pending qty is %i'
         if s_qty.isdigit() and s_price[0] == '@':
             if s_price[1:].replace('.', '').isdigit():
-                f_price = float(s_price[1:])
-                if agent._spread:
-                    if neutrino.Side.BID == _MAP_SIDE[s_side]:
-                        f_price = f_price - abs(agent._spread)
-                    elif neutrino.Side.ASK == _MAP_SIDE[s_side]:
-                        f_price = f_price + abs(agent._spread)
-
                 i_id = neutrino.oms.send_limit_order(
                     symbol=agent.my_symbol,
                     side=_MAP_SIDE[s_side],
-                    price=f_price,
+                    price=float(s_price[1:]),
                     time_in_force=neutrino.TimeInForce.DAY,
                     quantity=int(s_qty))
                 if i_id >= 0:
-                    i_qpending = neutrino.oms.get_total_quantity(
-                        symbol=agent.my_symbol, side=_MAP_SIDE[s_side],
-                        status=neutrino.OrderStatus.WAIT)
-                    print(s_msg % (
-                        s_txt, s_side, s_qty, s_price[1:], i_id, i_qpending))
+                    print('%s %s %s of something at %s using order %i' % (
+                        s_txt, s_side, s_qty, s_price[1:], i_id))
                 elif i_id < 0:
-                    print('%s fail to %s due %i' % (
+                    print('%s fail to %s due %s' % (
                         s_txt, s_side, i_id))
 
     # check order state
@@ -270,10 +268,6 @@ def process_raw_input(agent, s_txt):
     if len(l_data) == 3 and l_data[0] == 'replace':
         _process_replace(agent, l_data, s_txt)
 
-    # pdb
-    if len(l_data) == 1 and l_data[0] == 'pdb':
-        import pdb; pdb.set_trace()
-
 
 
 '''
@@ -281,20 +275,26 @@ End help functions
 '''
 
 
-class SendOrders(object):
+class TestNotify(object):
     def __init__(self):
         # initialize some variables
+        print('__init__', flush=True)
         self.i_count = 0
         self.i_count2 = 0
         self.i_keep_going = 1
+        self._config = {}
+        self._name = ''
         self.all_orders = {'BID': {}, 'ASK': {}}
+        self._time_to_quit = False
         if sys.version_info.major == 2:
             self.require_input = raw_input
         elif sys.version_info.major == 3:
             self.require_input = input
+        self._spread = 0
 
     # new callbacks
     def initialize(self, symbols):
+        print('initialize', flush=True)
         # initialize new variables
         self.symbols = []
         self.symbols2 = [s for s in symbols]
@@ -305,8 +305,6 @@ class SendOrders(object):
         self.my_symbol = symbols[0]
         self.last_ts = 0
         self.instr = {}
-        self._config = {}
-        self._spread = 0.
 
         # add instruments
         for s_symbol in symbols:
@@ -315,10 +313,10 @@ class SendOrders(object):
                 symbol=s_symbol,
                 trade_buffer_size=64)
 
-        print('\n\n    symbols added: ', self.symbols2, '\n\n')
+        print('\n\n    symbols added: ', self.symbols2, '\n\n', flush=True)
 
     def on_data(self, update):
-
+        # print('on_data', flush=True)
         # check if all structures is ready to be used
         this_instr = self.instr[self.my_symbol]
         if not (this_instr.ready()) or (self.my_symbol != update.symbol):
@@ -327,68 +325,91 @@ class SendOrders(object):
         # print every PRINT_EVERY counts
         self.i_count += 1
         if self.i_count % (PRINT_EVERY * self.i_keep_going) > 0:
-            print('.', end="")  #, flush=True)
+            print('.', end="", flush=True)
             return
         self.i_keep_going = 1
 
-        print(book2str(self, this_instr.book.sequence))
-        s_input = self.require_input('\nDo something here: ')
-        if s_input:
-            process_raw_input(self, s_input)
+        if self._time_to_quit and self.i_count > 1000:
+            # return
+            for s_symbol in self.symbols:
+                i_out = neutrino.oms.cancel_all(symbol=s_symbol)
+                print('cancel orders from %s: %i' % (s_symbol, i_out))
+            print('\n...quitting!!', flush=True)
+            neutrino.utils.quit()
+            return
+        elif not self._time_to_quit and self._config and self.i_count > 100:
+            print(book2str(self, this_instr.book.sequence), flush=True)
+            this_position = neutrino.position.get(update.symbol)
+            this_side=neutrino.Side.BID
+            this_price=this_instr.book.ask[0].price
+            this_price -= abs(self._spread)*this_instr.price_increment
+            if this_position.initial.net > 0:
+                this_side = neutrino.Side.ASK
+                this_price=this_instr.book.bid[0].price
+                this_price += abs(self._spread)*this_instr.price_increment
+            i_id = neutrino.oms.send_limit_order(
+                symbol=update.symbol,
+                side=this_side,
+                time_in_force=neutrino.TimeInForce.DAY,
+                price=this_price,
+                quantity=1)
+            neutrino.utils.notify(f'I AM ALIVE AND THE FIRST ORDERS IN THE BOOK'
+                                  f' ARE {this_instr.book.bid[0].quantity} '
+                                  f'@{this_instr.book.bid[0].price} | '
+                                  f'@{this_instr.book.ask[0].price} '
+                                  f'{this_instr.book.ask[0].quantity} !!!!')
+            self.i_count = self.i_count - 10
+            self._time_to_quit = True
+            print(f'ORDER SENT WAS ID {i_id}...', flush=True)
 
     def order_update(self, order):
-        print('[order_update] %s' % orderU2str(order))
-        # order_entry = neutrino.oms.get_order_by_id(order.unique_id)
-        # print('[order_update2] %s' % orderU2str(order_entry))
-        obj_filter =(
-            neutrino.OrderStatus.ACTIVE | neutrino.OrderStatus.WAIT |
-            neutrino.OrderStatus.WAIT_CANCEL |
-            neutrino.OrderStatus.REPLACED |neutrino.OrderStatus.WAIT_REPLACE)
-
-        i_bids = neutrino.oms.get_total_quantity(
-        symbol=self.my_symbol,
-            side=neutrino.Side.BID,
-            status=obj_filter)
-        i_asks = neutrino.oms.get_total_quantity(
-            self.my_symbol,
-             _MAP_SIDE['ASK'],
-            obj_filter)
-
-        print('  total on bid: %i, total on ask: %i' % (i_bids, i_asks))
-        position_status = neutrino.position.get(self.my_symbol)
-        print(position2str(position_status))
-        if order.status == neutrino.OrderStatus.ACTIVE:
-            pass
-            # import pdb; pdb.set_trace()
+        print('...order update')
 
     def order_filled(self, order, lastpx, lastqty):
-        obj_filter =(
-            neutrino.OrderStatus.ACTIVE | neutrino.OrderStatus.WAIT |
-            neutrino.OrderStatus.WAIT_CANCEL |
-            neutrino.OrderStatus.REPLACED |neutrino.OrderStatus.WAIT_REPLACE)
+        print('... order filled')
 
-        i_pending = neutrino.oms.get_total_quantity(
-            symbol=order.symbol,
-            side=order.side,
-            status=obj_filter)
+    def set_parameters(self, config):
+        print('set_parameters', flush=True)
+        d_conf = json.loads(config)
+        s_strat = list(d_conf.keys())[0]
+        self._name = s_strat
+        for s_main in d_conf[s_strat]:
+            if s_main not in self._config:
+                self._config[s_main] = {}
+            if isinstance(d_conf[s_strat][s_main], dict):
+                for s_in in d_conf[s_strat][s_main]:
+                    self._config[s_main][s_in] = d_conf[s_strat][s_main][s_in]
+            else:
+                self._config[s_main] = d_conf[s_strat][s_main]
+        if 'open_pos' in self._config:
+            self._spread = self._config['open_pos'].get('spread', 0)
+            print('!! new spread: %i' %  self._spread)
 
-        print('[order_filled] %s: %i %.2f. Pending=%i. Pos=%i' % (
-            orderU2str(order), lastqty, lastpx, i_pending,
-            neutrino.position.get(order.symbol).partial.net))
-        self.i_keep_going = 1
+        print(('[set_parameters]', config), flush=True)
+
+    def get_parameters(self):
+        print(('[get_parameters]', self._config), flush=True)
+        d_conf = {self._name: self._config}
+        s_strat = self._name
+        # try to hack the limit
+        # try to hack the limit
+        if 'open_pos' in d_conf[s_strat]:
+            d_conf[s_strat]['open_pos']['ask'] = False  # should reflect
+        if 'max_position' in d_conf[s_strat]:
+            d_conf[s_strat]['max_position'] = {
+                'WDOZ19': {'limit': 6, 'type_limit': 'quantity'}}  # should not
+            d_conf[s_strat]['max_position']['WDOZ19']['limit'] = 6
+        s_rtn = json.dumps(d_conf[s_strat])
+        print(('[get_parameters]2:', s_rtn), flush=True)
+        return s_rtn
 
     def finalize(self, reason):
         self.i_count2 += 1
         s_t = epoch2str(neutrino.utils.now())
-        print(f'{s_t}finalize {self.i_count, self.i_count2}: {str(reason)}')
-        # neutrino.utils.quit()
-
-    def set_parameters(self, config):
-        if 'online' in config:
-            self._config = '{"TestNotify":{"online":true}}'
-        print('[set_parameters]', config)  # , flush=True)
-
-    def get_parameters(self):
-        print('[get_parameters]', self._config)
-        return str(self._config)
-
+        print(
+            f'{s_t}finalize {self.i_count, self.i_count2}: {str(reason)}',
+            flush=True)
+        for s_symbol in self.symbols:
+            i_out = neutrino.oms.cancel_all(symbol=s_symbol)
+            print('cancel orders from %s: %i' % (s_symbol, i_out))
+        # neutrino.fx.quit()
