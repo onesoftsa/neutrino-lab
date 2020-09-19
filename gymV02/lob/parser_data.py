@@ -140,10 +140,16 @@ class LineParser(object):
                                '005': 'Reentry', '006': 'New Stop Price',
                                '007': 'Rejected', '008': 'Removed',
                                '009': 'Stop Price Triggered',
-                               '011': 'Expired', '012': 'Eliminated'}
+                               '011': 'Expired', '012': 'Eliminated',
+                               # new B3 format file
+                               '0': 'New', '4': 'Cancel', '5': 'Update',
+                               '8': 'Rejected', 'C': 'Expired', 'D': 'Reentry',
+                               'F': 'Trade'}
         self.d_order_status = {'0': 'New', '1': 'Partially Filled',
                                '2': 'Filled', '4': 'Canceled', '5': 'Replaced',
-                               '8': 'Rejected', 'C': 'Expired'}
+                               '8': 'Rejected', 'C': 'Expired',
+                               # new B3 format file
+                               'Z': 'Previous Final State'}
 
         self.d_aggressor = {'0': 'Neutral',
                             '1': 'Agressor',
