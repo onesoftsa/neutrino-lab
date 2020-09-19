@@ -428,11 +428,13 @@ class IndicatorName(Enum):
         return self.value.__hash__()
 
 
-QueueInfo = namedtuple('QueueInfo', 'quantity price')
-NextInfo = namedtuple('NextInfo', 'qty timeInForce price side userData')
-BookData = namedtuple('BookData', 'price quantity detail orderID order_id')
+s_book_info = 'price quantity detail orderID order_id virtual_md_id'
 s_trade_info = 'price quantity buyer seller date time status tradeID, trade_id'
 s_trade_info += ', datetime'
+
+QueueInfo = namedtuple('QueueInfo', 'quantity price')
+NextInfo = namedtuple('NextInfo', 'qty timeInForce price side userData')
+BookData = namedtuple('BookData', s_book_info)
 TradeInfo = namedtuple('TradeInfo', s_trade_info)
 SecurityInfo = namedtuple('SecurityInfo', 'priceIncrement minOrderQty')
 
@@ -1573,6 +1575,12 @@ class LimitOrderEntry(object):
         return None
 
     @property
+    def virtual_md_id(self):
+        if self.order.current and self.order.current.secondaryOrderID:
+            return int(self.order.current.secondaryOrderID)
+        return None
+
+    @property
     def time_in_force(self):
         if self.order.current and self.order.current.timeInForce:
             return self.order.current.timeInForce
@@ -2192,12 +2200,13 @@ class fx(object):
         # remove from fx
         d_pcbacks = fx.pending_callbacks
         d_scbacks = fx.symbols_callbacks
-        if i_id in d_scbacks:
+        if i_id in d_scbacks and i_id in d_pcbacks:
             d_pcbacks[i_id]['trade'] = []
             d_pcbacks[i_id]['book'] = []
             if not len(d_pcbacks[i_id]['other']):
                 d_pcbacks.pop(i_id)
-            d_scbacks[i_id].remove(symbol)
+            if symbol in d_scbacks[i_id]:
+                d_scbacks[i_id].remove(symbol)
 
         # remove from environment
         ENV.remove_callback(trigger=Source.MARKET, i_id=i_id,

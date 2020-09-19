@@ -808,7 +808,8 @@ class NeutrinoSide(object):
                                     sim_order.d_msg['total_qty_order'],
                                     sim_order.d_msg['member'],
                                     sim_order.d_msg['secondary_order_id'],
-                                    int(sim_order.d_msg['secondary_order_id']))
+                                    int(sim_order.d_msg['secondary_order_id']),
+                                    int(sim_order.main_id))
                 return obj_data
             i_current += i_len
 
@@ -951,7 +952,8 @@ class LimitOrderBook(object):
         _map = {'DOL': (5, 0.5),
                 'WDO': (1, 0.5),
                 'IND': (5, 5.),
-                'WIN': (1, 5.)}
+                'WIN': (1, 5.),
+                'DI1': (5, 0.01)}
         t_rtn = _map.get(self.s_instrument[:3], None)
         if t_rtn:
             obj_rtn = SecurityInfo(t_rtn[1], t_rtn[0])
