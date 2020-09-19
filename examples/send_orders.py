@@ -34,8 +34,10 @@ def epoch2str(epoch):
     return time.strftime(
         '[%Y-%m-%d %H:%M:%S.{}]'.format(mlsec), time.localtime(epoch))
 
+
 def foo(update):
     print('foo')  #, flush=True)
+
 
 def book2str(agent, i_seq):
     bid = neutrino.utils.by_price(
@@ -44,8 +46,9 @@ def book2str(agent, i_seq):
     s_book_msg = (
         '\n%son_data: book_seq=%i, qbid=%.0f, bid=%.2f, ' +
         'ask=%.2f, qask=%.0f')
-    return(s_book_msg % (epoch2str(neutrino.utils.now()),i_seq, bid[0].quantity,
-        bid[0].price, ask[0].price, ask[0].quantity))
+    return(s_book_msg % (epoch2str(neutrino.utils.now()), i_seq,
+                         bid[0].quantity, bid[0].price, ask[0].price,
+                         ask[0].quantity))
 
 
 def order2str(order_entry, s_txt):
@@ -53,23 +56,23 @@ def order2str(order_entry, s_txt):
         print('%s fail to find order %s' % (s_txt, s_id))
         return
     print(s_txt +
-        f'order({order_entry.unique_id}): ' +
-        f'side={order_entry.side},' +
-        f'secondary_order_id={order_entry.secondary_order_id},' +
-        f'type={order_entry.type},' +
-        f'account={order_entry.account},' +
-        f'symbol={order_entry.symbol},' +
-        f'tif={order_entry.time_in_force},' +
-        f'status={order_entry.status},' +
-        f'price={order_entry.price},' +
-        f'last_price={order_entry.last_price},' +
-        f'qty={order_entry.quantity},' +
-        f'filled_qty={order_entry.filled_quantity},' +
-        f'leaves_qty={order_entry.leaves_quantity},' +
-        f'last_qty={order_entry.last_quantity},' +
-        f'alive={order_entry.is_alive()},' +
-        f'pending={order_entry.is_pending()},' +
-        f'dead={order_entry.is_dead()}')
+          f'order({order_entry.unique_id}): ' +
+          f'side={order_entry.side},' +
+          f'secondary_order_id={order_entry.secondary_order_id},' +
+          f'type={order_entry.type},' +
+          f'account={order_entry.account},' +
+          f'symbol={order_entry.symbol},' +
+          f'tif={order_entry.time_in_force},' +
+          f'status={order_entry.status},' +
+          f'price={order_entry.price},' +
+          f'last_price={order_entry.last_price},' +
+          f'qty={order_entry.quantity},' +
+          f'filled_qty={order_entry.filled_quantity},' +
+          f'leaves_qty={order_entry.leaves_quantity},' +
+          f'last_qty={order_entry.last_quantity},' +
+          f'alive={order_entry.is_alive()},' +
+          f'pending={order_entry.is_pending()},' +
+          f'dead={order_entry.is_dead()}')
 
 
 def position2str(position_status):
@@ -88,7 +91,6 @@ def position2str(position_status):
     s_rtn += 'vAsk=%.2f,' % position_status.partial.ask_volume
     s_rtn += 'qAsk=%.2f]\n' % position_status.partial.ask_quantity
 
-
     s_rtn += '    INITIAL:  net=%i,' % position_status.initial.net
     s_rtn += 'net_price=%.2f [' % position_status.initial.net_price
     s_rtn += 'qBid=%.2f,' % position_status.initial.bid_quantity
@@ -97,6 +99,7 @@ def position2str(position_status):
     s_rtn += 'qAsk=%.2f]\n' % position_status.initial.ask_quantity
 
     return s_rtn
+
 
 def orderU2str(order_entry):
     if isinstance(order_entry, type(None)):
@@ -166,6 +169,31 @@ def _process_where(agent, l_data, s_txt):
         return
 
 
+def _process_where_virtual(agent, l_data, s_txt):
+    s_cmd, s_id = l_data
+    if s_id.isdigit():
+        order_entry = neutrino.oms.get_order_by_id(int(s_id))
+        if isinstance(order_entry, type(None)):
+            print('%s fail to find order %s' % (s_txt, s_id))
+            return
+        instr = neutrino.market.get(order_entry.symbol)
+        if str(order_entry.side) == 'BID':
+            l_ids = [x.virtual_md_id for x in instr.book.bid]
+        else:
+            l_ids = [x.virtual_md_id for x in instr.book.ask]
+        i_my_ii = -1
+        for ii, virtual_md_id in enumerate(l_ids):
+            if ((i_my_ii == -1) and
+                virtual_md_id <= order_entry.virtual_md_id):
+                i_my_ii = ii
+        print(
+            f'my order with virtualid {order_entry.virtual_md_id} ' +
+            f'is in position {i_my_ii}. The min ID in the book ' +
+            f'is {min(l_ids)} and the order_entry virtualid type ' +
+            f'is {type(order_entry.virtual_md_id)}')
+        return
+
+
 def _process_cancel(agent, l_data, s_txt):
     s_cmd, s_id = l_data
     if s_id.isdigit():
@@ -192,6 +220,7 @@ def _process_cancel(agent, l_data, s_txt):
         s_side = _MAP_SIDE[s_id[4:]]
         l_orders = neutrino.oms.cancel_all(
             agent.my_symbol, side=s_side)
+
 
 def _process_replace(agent, l_data, s_txt):
     s_cmd, s_id, s_price = l_data
@@ -262,6 +291,10 @@ def process_raw_input(agent, s_txt):
     if len(l_data) == 2 and l_data[0] == 'where':
         _process_where(agent, l_data, s_txt)
 
+    # check order position user vitual_md_id
+    if len(l_data) == 2 and l_data[0] == 'wherev':
+        _process_where_virtual(agent, l_data, s_txt)
+
     # cancel orders
     if len(l_data) == 2 and l_data[0] == 'cancel':
         _process_cancel(agent, l_data, s_txt)
@@ -273,7 +306,6 @@ def process_raw_input(agent, s_txt):
     # pdb
     if len(l_data) == 1 and l_data[0] == 'pdb':
         import pdb; pdb.set_trace()
-
 
 
 '''
@@ -343,15 +375,15 @@ class SendOrders(object):
         obj_filter =(
             neutrino.OrderStatus.ACTIVE | neutrino.OrderStatus.WAIT |
             neutrino.OrderStatus.WAIT_CANCEL |
-            neutrino.OrderStatus.REPLACED |neutrino.OrderStatus.WAIT_REPLACE)
+            neutrino.OrderStatus.REPLACED | neutrino.OrderStatus.WAIT_REPLACE)
 
         i_bids = neutrino.oms.get_total_quantity(
-        symbol=self.my_symbol,
+            symbol=self.my_symbol,
             side=neutrino.Side.BID,
             status=obj_filter)
         i_asks = neutrino.oms.get_total_quantity(
             self.my_symbol,
-             _MAP_SIDE['ASK'],
+            _MAP_SIDE['ASK'],
             obj_filter)
 
         print('  total on bid: %i, total on ask: %i' % (i_bids, i_asks))
@@ -362,10 +394,10 @@ class SendOrders(object):
             # import pdb; pdb.set_trace()
 
     def order_filled(self, order, lastpx, lastqty):
-        obj_filter =(
+        obj_filter = (
             neutrino.OrderStatus.ACTIVE | neutrino.OrderStatus.WAIT |
             neutrino.OrderStatus.WAIT_CANCEL |
-            neutrino.OrderStatus.REPLACED |neutrino.OrderStatus.WAIT_REPLACE)
+            neutrino.OrderStatus.REPLACED | neutrino.OrderStatus.WAIT_REPLACE)
 
         i_pending = neutrino.oms.get_total_quantity(
             symbol=order.symbol,

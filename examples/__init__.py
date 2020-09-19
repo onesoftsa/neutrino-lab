@@ -19,6 +19,6 @@ Created on 09/05/2017
 from .print_candles import PrintCandles
 from .print_trades import PrintTrades
 from .send_orders import SendOrders
-from .notify_test import NotifyTest
+from .test_notify import TestNotify
 from .scheduler_test import SchedulerTest
 

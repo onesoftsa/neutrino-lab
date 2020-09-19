@@ -40,7 +40,7 @@ if __name__ == '__main__':
             - SendOrders
             - PrintTrades
             - PrintCandles
-            - NotifyTest
+            - TestNotify
             - SchedulerTest
             '''
     obj_formatter = argparse.RawDescriptionHelpFormatter
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     d_implemented_agens = {'SendOrders': ('sendorders', my_agent.SendOrders),
                            'PrintTrades': ('printtrades', my_agent.PrintTrades),
                            'PrintCandles': ('printcandles', my_agent.PrintCandles),
-                           'NotifyTest': ('notifytest', my_agent.NotifyTest),
+                           'TestNotify': ('testnotify', my_agent.TestNotify),
                            'SchedulerTest': ('schltst', my_agent.SchedulerTest)}
     s_agent, agent_to_test = d_implemented_agens[args.agent]
     env = agents_tests.make_pnlenv()
