@@ -1577,7 +1577,8 @@ class LimitOrderEntry(object):
     @property
     def virtual_md_id(self):
         if self.order.current and self.order.current.secondaryOrderID:
-            return int(self.order.current.secondaryOrderID)
+            if self.order.current.secondaryOrderID[:3] != 'sec':
+                return int(self.order.current.secondaryOrderID)
         return None
 
     @property
@@ -1641,7 +1642,7 @@ class LimitOrderEntry(object):
         return self.unique_id
 
     def replace(self, price, quantity, time_in_force):
-        return self.replace_limit(self, price, quantity, time_in_force)
+        return self.replace_limit(price, quantity, time_in_force)
 
     def replace_limit(self, price, quantity, time_in_force):
         # DEPRECTED
@@ -1800,11 +1801,21 @@ class oms(object):
             time_in_force=time_in_force, i_id=i_id)
 
     @staticmethod
+    def send(symbol, side, price, quantity, time_in_force, i_id=11):
+        return oms_client.send_limit_order(
+            symbol=symbol, side=side, price=price, quantity=quantity,
+            time_in_force=time_in_force, i_id=i_id)
+
+    @staticmethod
     def get_order_by_id(order_id, i_id=11):
         return oms_client.get_order_by_id(order_id=order_id, i_id=i_id)
 
     @staticmethod
     def get_total_quantity(symbol, side, status=None, i_id=11):
+        # TODO: cover all cases
+        # only wait orders combination
+        if isinstance(status, int) and status < 4:
+            return 0
         return oms_client.get_total_quantity(
             symbol=symbol, side=side, i_id=i_id)
 

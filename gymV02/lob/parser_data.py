@@ -279,6 +279,8 @@ class LineParser(object):
         s_aux = l_data[6]
         f_aux = int(s_aux[0:2])*60*60 + int(s_aux[3:5])*60 + int(s_aux[6:8])
         f_aux += float(s_aux[9:])/10**6
+        f_aux = sum([float(xx)*60**(2-ii) for ii, xx in
+                    enumerate(s_aux.split(':'))])
         d_rtn['priority_time'] = s_aux
         d_rtn['priority_seconds'] = f_aux
         # Priority indicator
@@ -310,6 +312,7 @@ class LineParser(object):
         # field usess to control the loop
         s_idx = d_rtn['order_date'].replace('-', '')
         d_rtn['idx'] = s_idx[2:] + l_data[4][6:]
+        # d_rtn['idx'] = int(l_data[7])
         d_rtn['is_today'] = d_rtn['order_date'] == d_rtn['session_date']
         # include new fields
         d_rtn['action'] = 'history'

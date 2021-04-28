@@ -12,6 +12,7 @@ Created on 01/11/2018
 """
 
 import time
+import sys
 import socket
 import pickle
 import json
@@ -19,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import signal
 
 import numpy
 from mpl_toolkits.axes_grid1 import host_subplot
@@ -40,6 +42,19 @@ time_style = dict(horizontalalignment='center', verticalalignment='center',
                   color='black', weight='bold')
 info_style = dict(horizontalalignment='left', verticalalignment='center',
                   fontsize=13, fontdict={'family': 'sans-serif'})
+
+
+def signal_handler(i_signal, frame):
+    '''
+    Terminate neutrino when receiving Ctrl+C from anywhere
+    '''
+    if i_signal == 2:
+        print('signal_handler(): You pressed Ctrl+C!')
+        sys.exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
+
 
 '''
 End help functions
@@ -80,6 +95,7 @@ def img_init(fig, l_instr, d_data):
 
     l_ax = []
 
+    l_instr = set(l_instr)
     i_charts = len(l_instr)
     i_count = 0
     for i_row in range(1, i_mrow*2+1, 2):
@@ -156,12 +172,28 @@ def img_update(i, d_obj, serverSocket, l_instr):
     # d_data = pickle.loads(message)
     d_data = json.loads(message)
 
+    # print summary information
+    d_count = {k: {
+            'BID': len(d_data['agent_prices'][k]['B']),
+            'ASK': len(d_data['agent_prices'][k]['A'])
+        }
+        for k in d_data['agent_prices'].keys()
+    }
+
+    print('[%s] %s, %s, %s' % (
+        d_data['time'][:-3],
+        'PnL: R$ {:.01f}'.format(d_data['pnl']),
+        'Pos: {:.0f}'.format(d_data['position']),
+        'Num. agent prices: {:s}'.format(str(d_count)))
+    )
+
+    # update book image
     f_pnl = 0.
     f_pos = 0.
     f_tot = 0.
     f_tot += 0.
     f_delta = 0.
-    d_agent_prices = d_data['agent_prices']
+    d_agentp = d_data['agent_prices']
     try:
 
         f_pnl = d_data['pnl']
@@ -175,7 +207,7 @@ def img_update(i, d_obj, serverSocket, l_instr):
         d_obj['summary']['tot'].set_text('Total traded: {:.0f}'.format(f_tot))
     except TypeError:
         pass
-    for s_cmm in l_instr:
+    for s_cmm in set(l_instr):
         l_col = ['qBid', 'Bid', 'Ask', 'qAsk']
         df_book = pd.DataFrame(d_data[s_cmm], columns=l_col)
         for i in range(df_book.shape[0]):
@@ -185,8 +217,8 @@ def img_update(i, d_obj, serverSocket, l_instr):
             # Bid
             s_txt1 = '{}'.format(df_book.iloc[i, 1])
             d_obj[s_cmm]['Bid'][i].set_text(s_txt1)
-            b_test1 = s_cmm in d_agent_prices
-            if b_test1 and float(df_book.iloc[i, 1]) in d_agent_prices[s_cmm]:
+            b_test1 = s_cmm in d_agentp
+            if b_test1 and float(df_book.iloc[i, 1]) in d_agentp[s_cmm]['B']:
                 d_obj[s_cmm]['Bid'][i].set_bbox(dict(facecolor='gray',
                                                      alpha=0.5,
                                                      edgecolor='none'))
@@ -195,7 +227,7 @@ def img_update(i, d_obj, serverSocket, l_instr):
             # Ask
             s_txt2 = '{}'.format(df_book.iloc[i, 2])
             d_obj[s_cmm]['Ask'][i].set_text(s_txt2)
-            if b_test1 and float(df_book.iloc[i, 2]) in d_agent_prices[s_cmm]:
+            if b_test1 and float(df_book.iloc[i, 2]) in d_agentp[s_cmm]['A']:
                 d_obj[s_cmm]['Ask'][i].set_bbox(dict(facecolor='gray',
                                                      alpha=0.5,
                                                      edgecolor='none'))

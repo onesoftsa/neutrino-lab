@@ -25,7 +25,7 @@ class PnLEnv(neutrinogym.EnvWrapper):
              'DI1F23': 144.07 * 100./2,
              'DI1F25': 166.07 * 100./2,
              'DI1F27': 175.14 * 100./2,
-             'DOLH19': 50.}
+             'DOL': 50., 'IND': 1.}
 
     def __init__(self, env):
         super(PnLEnv, self).__init__(env)
@@ -65,8 +65,11 @@ class PnLEnv(neutrinogym.EnvWrapper):
             f_vol += d_position[s_asset]['Bid']
             f_vol -= d_position[s_asset]['Ask']
             f_vol *= -1
+            f_dv01 = self._dv01.get(s_asset, None)
+            if isinstance(f_dv01, type(None)):
+                f_dv01 = self._dv01.get(s_asset[:3])
             if i_qty == 0:
-                f_pnl = (f_vol) * self._dv01[s_asset]
+                f_pnl = (f_vol) * f_dv01
                 f_curr_pnl += f_pnl
                 continue
             # calcule the pnl
@@ -74,7 +77,7 @@ class PnLEnv(neutrinogym.EnvWrapper):
             (f_bid, _) = my_book.best_bid
             (f_ask, _) = my_book.best_ask
             f_mid = (f_bid + f_ask)/2.
-            f_pnl = (f_vol + i_qty * f_mid) * self._dv01[s_asset]
+            f_pnl = (f_vol + i_qty * f_mid) * f_dv01
             f_curr_pnl += f_pnl
 
         self.d_trial_data['agents_pnl'][agent.i_id] = f_curr_pnl
@@ -151,8 +154,10 @@ class MyMonitor(neutrinogym.wrappers.Monitor):
         # try:
         for instr in self._instr_stack.values():
             l_aux = [x for x in instr._prices['ASK'].keys()]
-            l_aux += [x for x in instr._prices['BID'].keys()]
-            d_agent_prices[instr.symbol_name] = l_aux
+            l_aux2 = [x for x in instr._prices['BID'].keys()]
+            d_agent_prices[instr.symbol_name] = {'A': [], 'B': []}
+            d_agent_prices[instr.symbol_name]['A'] = l_aux
+            d_agent_prices[instr.symbol_name]['B'] = l_aux2
         # except (KeyError, AttributeError) as e:
         #     pass
         # print d_agent_prices

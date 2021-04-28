@@ -14,7 +14,7 @@ from neutrinogym import neutrino
 
 
 SIDE = {'BID': 'Buy Order', 'ASK': 'Sell Order'}
-START_SESSION = 9+60**2 + 20*60
+START_SESSION = 9*60**2 + 20*60
 END_SESSION = 17*60**2 + 40*60
 
 
@@ -59,6 +59,7 @@ def translate_trades(row, my_book):
             # check if the order Id is different from the message
             d_compare = obj_order.d_msg
             if row['seq_order_number'] != d_compare['seq_order_number']:
+                my_book.i_count_correction_by_trades += 1
                 # create a trade to fill that order
                 i_org_qty = d_compare['org_total_qty_order']
                 i_traded_qty = d_compare['traded_qty_order']
@@ -143,23 +144,36 @@ def translate_row(idx, row, my_book, s_side=None):
     # check if there are other orders before the order traded
     b_trade1 = (row['execution_type'] == 'Trade')
     b_trade2 = (row['agressor_indicator'] == 'Passive')
+    if b_trade1:
+        my_book.i_count_crossed_books = 0
     if b_trade1 and b_trade2:
         return translate_trades(row, my_book)
 
     # check if the new row will cross the book
-    if row['order_side'] == 'Sell Order':
+    b_status2check =  row['order_status'] in ['New', 'Replaced']
+    if row['order_side'] == 'Sell Order' and b_status2check:
         if my_book.best_bid and row['order_price'] <= my_book.best_bid[0]:
-            my_book.i_count_crossed_books += 1
+            if (row['priority_seconds'] - my_book.f_time_crossed_books) > 0.005:
+                my_book.f_time_crossed_books = row['priority_seconds']
+                my_book.i_count_crossed_books += 1
             if my_book.i_count_crossed_books > 3 or row['agent_id'] != 10:
+                my_book.f_time_crossed_books = row['priority_seconds']
                 # print '\n\n!!! Ask order crossed BID'
+                # import pdb; pdb.set_trace()
                 return translate_trades_to_agent(row, my_book)
-    elif row['order_side'] == 'Buy Order':
+    elif row['order_side'] == 'Buy Order' and b_status2check:
         if my_book.best_ask and row['order_price'] >= my_book.best_ask[0]:
-            my_book.i_count_crossed_books += 1
+            if (row['priority_seconds'] - my_book.f_time_crossed_books) > 0.005:
+                my_book.f_time_crossed_books = row['priority_seconds']
+                my_book.i_count_crossed_books += 1
             if my_book.i_count_crossed_books > 3 or row['agent_id'] != 10:
+                my_book.f_time_crossed_books = row['priority_seconds']
                 # print '\n\n!!! Buy order crossed ASK'
+                # import pdb; pdb.set_trace()
                 return translate_trades_to_agent(row, my_book)
 
+    # if row['seq_order_number'] == '7411839667717':
+    #     import pdb; pdb.set_trace()
     return [row]
 
 
@@ -396,7 +410,7 @@ def translate_trades_to_agent(row, my_book):
     b_row_from_agent = False
     i_qty = row['total_qty_order']
     if not gen_bk:
-        return None
+        return []
     for f_price, obj_price in gen_bk:
         if b_stop:
             break
@@ -409,7 +423,7 @@ def translate_trades_to_agent(row, my_book):
             # check how many qty it still need to be traded
             i_qty -= i_qty_to_trade
             # define the status of the message
-            if order_aux['total_qty_order'] == i_qty_to_trade:
+            if order_aux['total_qty_order'] <= i_qty_to_trade:
                 s_status = 'Filled'
             else:
                 s_status = 'Partially Filled'
@@ -473,8 +487,11 @@ def translate_trades_to_agent(row, my_book):
                 order = order_aux['neutrino_order']
                 order.status = neutrino.FIXStatus.PENDING
                 # order.current.price = order_aux['order_price']
-                order.current.cumQty = min(
-                    abs(i_new_qty_traded), order.current.qty)
+                if not isinstance(order.current.qty, type(None)):
+                    order.current.cumQty = min(
+                        abs(i_new_qty_traded), order.current.qty)
+                else:
+                    order.current.cumQty = i_new_qty_traded
                 if s_status == 'Partially Filled':
                     order.current.status = neutrino.FIXStatus.PARTIALLY_FILLED
                     order.current.isAlive = True
@@ -487,7 +504,7 @@ def translate_trades_to_agent(row, my_book):
             # check the id of the agressive side
 
             # define the status of the agressor message
-            if i_qty == 0:
+            if i_qty <= 0:
                 s_status = 'Filled'
             else:
                 s_status = 'Partially Filled'
@@ -552,7 +569,7 @@ def translate_trades_to_agent(row, my_book):
                 d_rtn['neutrino_order'] = order
 
             l_msg.append(d_rtn.copy())
-            if i_qty == 0:
+            if i_qty <= 0:
                     b_stop = True
                     break
     if b_row_from_agent:

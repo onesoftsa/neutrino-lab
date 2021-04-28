@@ -53,15 +53,18 @@ if __name__ == '__main__':
         message, address = serverSocket.recvfrom(1024)
         d_data = json.loads(message)
 
-        d_count = {k: len(d_data['agent_prices'][k])
-        for k in d_data['agent_prices'].keys()
+        d_count = {k: {
+                'BID': len(d_data['agent_prices'][k]['B']),
+                'ASK': len(d_data['agent_prices'][k]['A'])
+            }
+            for k in d_data['agent_prices'].keys()
         }
 
         print('[%s] %s, %s, %s' % (
             d_data['time'][:-3],
             'PnL: R$ {:.01f}'.format(d_data['pnl']),
             'Pos: {:.0f}'.format(d_data['position']),
-            'Num. agent prices: {:s}'.format(d_count))
+            'Num. agent prices: {:s}'.format(str(d_count)))
         )
 
     # Uncomment the next line if you want to save the animation

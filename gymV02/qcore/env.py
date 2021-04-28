@@ -526,47 +526,14 @@ class Env(object):
                 self.instr_data_subscribed[s_instr][s_name] = set()
             self.instr_data_subscribed[s_instr][s_name].add(i_id)
             d_aux['CANDLE_NAME'] = s_name
-            d_aux['MAX'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                   i_count=i_count,
-                                                   s_type='MAX')
-            d_aux['MIN'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                   i_count=i_count,
-                                                   s_type='MIN')
-            d_aux['LST'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                   i_count=i_count,
-                                                   s_type='LST')
-
-            d_aux['QTD'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                   i_count=i_count,
-                                                   s_type='QTD')
-
-            d_aux['NTRADES'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                       i_count=i_count,
-                                                       s_type='NTRADES')
-
-            d_aux['QTD_B'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                     i_count=i_count,
-                                                     s_type='QTD_B')
-            d_aux['QTD_S'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                     i_count=i_count,
-                                                     s_type='QTD_S')
-
-            d_aux['CUMQTD'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                      i_count=i_count,
-                                                      s_type='CUMQTD')
-            d_aux['CUMQTD_B'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                        i_count=i_count,
-                                                        s_type='CUMQTD_B')
-            d_aux['CUMQTD_S'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                        i_count=i_count,
-                                                        s_type='CUMQTD_S')
-
-            d_aux['VOLUME'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                      i_count=i_count,
-                                                      s_type='VOLUME')
-            d_aux['TS'] = data_feeder.ElapsedList(f_elapsed_time=f_time,
-                                                  i_count=i_count,
-                                                  s_type='TS')
+            if 'MAX' not in d_aux:
+                for s_field in ['MAX', 'MIN', 'LST', 'QTD', 'NTRADES', 'QTD_B',
+                                'QTD_S', 'CUMQTD', 'CUMQTD_B', 'CUMQTD_S',
+                                'VOLUME', 'TS']:
+                    d_aux[s_field] = data_feeder.ElapsedList(
+                        f_elapsed_time=f_time,
+                        i_count=i_count,
+                        s_type=s_field)
         else:
             d_aux = self.instr_data[s_instr][s_this_name]
             s_name = '{}:{}:{}'.format(s_source, s_instr, s_conf)

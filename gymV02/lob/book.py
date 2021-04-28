@@ -124,7 +124,7 @@ class TradeBuffer(object):
         if self.b_erase_data:
             self.l = deque([], maxlen=self.maxcount)
             self.index = 0
-        if item and item['order_qty']:
+        if item and item['order_qty']:  # and item['action'] == 'history':
             item['trade_id'] = self.last_trade_id
             self.last_trade_id += 1
             self.l.append(item)
@@ -215,6 +215,9 @@ class Order(object):
         :param other: Order object. Order to be compared
         '''
         if isinstance(other, str):
+            i_aux = int(other)
+            return self.order_id == i_aux
+        if isinstance(other, int):
             i_aux = int(other)
             return self.order_id == i_aux
         return self.order_id == other.order_id
@@ -483,13 +486,23 @@ class BookSide(object):
                                                       f_old_pr,
                                                       i_old_q)
             elif s_status == 'Partially Filled':
-                b_sould_update = self._partially_filled(order_aux,
-                                                        i_old_id,
-                                                        f_old_pr,
-                                                        i_old_q)
+                if (i_old_q - order_aux.d_msg['total_qty_order']) >= 0:
+                    b_sould_update = self._partially_filled(order_aux,
+                                                            i_old_id,
+                                                            f_old_pr,
+                                                            i_old_q)
+                else:
+                    b_sould_update = False
+                    s_status = 'Invalid'
         # remove from order map
         if s_status not in ['New', 'Invalid']:
             self.d_order_map.pop(order_aux)
+        # debug
+        # if order_aux.d_msg['seq_order_number'] == '7410081465859':
+        # if order_aux.d_msg['secondary_order_id'] == '7411189361089':
+        #     import pprint; pprint.pprint(order_aux.d_msg)
+        #     print()
+        # end debug
         # update the order map
         if b_sould_update:
             f_qty = int(order_aux['total_qty_order'])
@@ -521,6 +534,7 @@ class BookSide(object):
         if not order_obj.d_msg['order_qty']:
             order_obj.d_msg['order_qty'] = i_old_q
             order_obj.d_msg['order_qty'] -= order_obj.d_msg['total_qty_order']
+            order_obj.d_msg['order_qty'] = max(0, order_obj.d_msg['order_qty'])
         this_price = self.price_tree.get(f_old_pr)
         if this_price.delete(i_old_id, i_old_q):
             self.price_tree.remove(f_old_pr)
@@ -635,7 +649,21 @@ class BookSide(object):
         # treat when the line is zero
         # TODO: I should move it to preprocessment step
         if 'order_price' in d_aux:
-            if d_aux['order_price'] == 0.:
+            # if d_aux['seq_order_number'] == '7411839667717':
+            #     import pprint; pprint.pprint(d_aux)
+            #     print()
+            #     if d_aux['order_status'] != 'New':
+            #         import pdb; pdb.set_trace()
+            if d_aux['order_price'] < 1e-6:
+                if d_aux['order_status'] == 'Replaced':
+                    # self.d_order_map
+                    d_this_ = self.d_order_map.get(int(d_aux['seq_order_number']), None)
+                    if not isinstance(d_this_, type(None)):
+                        d_aux['order_status'] = 'Canceled'
+                        d_aux['execution_type'] = 'Update'
+                        d_aux['order_price'] = d_this_['price']
+                        # import pdb; pdb.set_trace()
+                        return d_aux, self.parser.last_identification
                 while True:
                     row = self.fr_data.readline()
                     d_aux = self.parser(row)
@@ -868,10 +896,12 @@ class LimitOrderBook(object):
         self.last_stop_time = None
         self.i_last_order_id = 0
         # initiate control variables
-        self.i_sec_ask = 9999999999999999
-        self.i_sec_bid = 9999999999999999
-        self.i_last_sec_ask = 9999999999999999
-        self.i_last_sec_bid = 9999999999999999
+        self.i_sec_ask = 99999999999999999999999
+        self.i_sec_bid = 99999999999999999999999
+        self.i_secb_ptime = 0
+        self.i_seca_ptime = 0
+        self.i_last_sec_ask = 99999999999999999999999
+        self.i_last_sec_bid = 99999999999999999999999
         self._last_priority_id = 0
         self.last_ident_bid = ''
         self.last_ident_ask = ''
@@ -900,6 +930,8 @@ class LimitOrderBook(object):
         # need to control that because the books sometimes is in a transition
         # state and the algo has to give sometime to all updates take place
         self.i_count_crossed_books = 0
+        self.f_time_crossed_books = 0.
+        self.i_count_correction_by_trades = 0
         self._update_map = {'Buy Order': self.book_bid,
                             'Sell Order': self.book_ask}
         # sequence number
@@ -1103,11 +1135,12 @@ class LimitOrderBook(object):
                             i_new_sec = long(self.d_bid['idx'])  # py2
                         else:
                             i_new_sec = int(self.d_bid['idx'])  # py3
-                        b_t1 = self.i_sec_bid == 9999999999999999
-                        b_t2 = abs(i_new_sec - self.i_last_sec_bid) < 10e4
+                        b_t1 = self.i_sec_bid == 99999999999999999999999
+                        b_t2 = abs(i_new_sec - self.i_last_sec_bid) < 10e7
                         if b_t1 or b_t2:
                             self.i_get_new_bid = False
                             self.i_sec_bid = i_new_sec
+                            self.i_secb_ptime = self.d_bid['priority_seconds']
             except StopIteration:
                 self.i_read_bid = False
         # read ask
@@ -1120,17 +1153,25 @@ class LimitOrderBook(object):
                             i_new_sec = long(self.d_ask['idx'])  # py2
                         else:
                             i_new_sec = int(self.d_ask['idx'])  # py3
-                        b_t1 = self.i_sec_ask == 9999999999999999
+                        b_t1 = self.i_sec_ask == 99999999999999999999999
                         b_t2 = abs(i_new_sec - self.i_last_sec_ask) < 10e4
                         if b_t1 or b_t2:
                             self.i_get_new_ask = False
                             self.i_sec_ask = i_new_sec
+                            self.i_seca_ptime = self.d_ask['priority_seconds']
             except StopIteration:
                 self.i_read_ask = False
         # update the book
         l_msg = []
         if self.last_ident_bid == 'MSG' and self.last_ident_ask == 'MSG':
-            if self.i_sec_ask < self.i_sec_bid:
+            b_ttask = (self.i_seca_ptime - self.i_secb_ptime) < 1e-6
+            b_ttbid = (self.i_secb_ptime - self.i_seca_ptime) < 1e-6
+            b_tsame = abs(self.i_secb_ptime - self.i_seca_ptime) < 1e-6
+            # if self.d_ask['seq_order_number'] == '7411839667717':
+            #     import pprint; pprint.pprint(self.d_ask)
+            #     print()
+            # if b_ttask or (self.i_sec_ask < self.i_sec_bid and b_ttask):
+            if b_ttask or (self.i_sec_ask < self.i_sec_bid and b_tsame):
                 # check stop time
                 if self.stop_time:
                     if self.d_ask['is_today']:
@@ -1143,14 +1184,15 @@ class LimitOrderBook(object):
                 if self.d_ask['action'] == 'history':
                     self.last_priority_id = self.d_ask['priority_indicator']
                     self.i_last_sec_ask = self.i_sec_ask
-                    self.i_sec_ask = 9999999999999999
+                    self.i_sec_ask = 99999999999999999999999
                     self.i_get_new_ask = True
                     self.f_time = self.d_ask['priority_seconds']
                     s_time = self.d_ask['priority_time']
                     s_date = self.d_ask['session_date']
                     self.s_time = '{} {}'.format(s_date, s_time)
 
-            elif self.i_sec_bid < self.i_sec_ask:
+            # elif b_ttbid or (self.i_sec_bid < self.i_sec_ask and b_ttbid):
+            elif b_ttbid or (self.i_sec_bid < self.i_sec_ask and b_tsame):
                 # check stop time
                 if self.stop_time:
                     if self.d_bid['is_today']:
@@ -1163,7 +1205,7 @@ class LimitOrderBook(object):
                 if self.d_bid['action'] == 'history':
                     self.last_priority_id = self.d_bid['priority_indicator']
                     self.i_last_sec_bid = self.i_sec_bid
-                    self.i_sec_bid = 9999999999999999
+                    self.i_sec_bid = 99999999999999999999999
                     self.i_get_new_bid = True
                     self.f_time = self.d_bid['priority_seconds']
                     s_time = self.d_bid['priority_time']
@@ -1255,6 +1297,7 @@ class LimitOrderBook(object):
                 assert len(l_msg) == 1, s_err.format(len(l_msg))
         # TODO: loop until the book is OK
         # check consistency
+        # NOTE: COMMENT THAT TO STOP CORRECTIONS
         b_correct, d_correct = translator.correct_books(self)
         if b_correct:
             l_aux = [self.book_bid, self.book_ask]
