@@ -593,9 +593,10 @@ class Order(object):
         NEW, REPLACED, PARTIALLY_FILLED.
         Otherwise, False.
         '''
-        l_is_alive = [FIXStatus.FILLED, FIXStatus.NEW]
-        b_t1 = self.status in l_is_alive
-        b_t2 = self.current and self.current.status in l_is_alive
+
+        l_is_dead = [FIXStatus.FILLED, FIXStatus.CANCELLED, FIXStatus.REJECTED]
+        b_t1 = self.status in l_is_dead
+        b_t2 = self.current and self.current.status in l_is_dead
         return b_t1 or b_t2
 
     def __str__(self):
