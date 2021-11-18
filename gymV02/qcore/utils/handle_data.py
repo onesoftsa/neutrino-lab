@@ -93,10 +93,11 @@ class CandlesHandler(object):
         else:
             for d_conf in this_candle.l_to_subscribe:
                 if str(d_conf['what']) != 'CANDLE' and b_t:
-                    if sum(
-                        [(d_conf[s_key]!=this_conf[s_key]) * 1
-                        for s_key in this_conf]):
-                        continue
+                    if isinstance(this_conf, dict):
+                        if sum(
+                            [(d_conf[s_key]!=this_conf[s_key]) * 1
+                            for s_key in this_conf]):
+                            continue
                 try:
                     fx.unsubscribeIndicator(str(d_conf['symbol']),
                                             str(d_conf['what']),
@@ -413,6 +414,83 @@ class CandleData(object):
         f_nbdev = kwargs.get('nbdev', None)
         if f_nbdev and s_ta_name == 'STDDEV':
             s_conf = 'nbdev={:0.0f};{}'.format(f_nbdev, s_conf)
+
+        # define SAR conf
+        if s_ta_name == 'SAR':
+            f_acceleration = kwargs.get('acceleration')
+            f_maximum = kwargs.get('maximum')
+            s_conf = 'maximum={:0.0f};{}'.format(f_maximum, s_conf)
+            s_conf = 'acceleration={:0.0f};{}'.format(f_acceleration, s_conf)
+
+        # define STOCH conf
+        if s_ta_name == 'STOCH':
+
+            f_fast_k_ma_period = kwargs.get('fast_k_ma_period')
+            s_conf = 'fast_k_ma_period={:0.0f};{}'.format(
+                f_fast_k_ma_period, s_conf)
+
+            # f_fast_ma_type = kwargs.get('fast_ma_type')
+            # s_conf = 'fast_ma_type={:0.0f};{}'.format(
+            #     f_fast_ma_type, s_conf)
+
+            f_slow_k_ma_period = kwargs.get('slow_k_ma_period')
+            s_conf = 'slow_k_ma_period={:0.0f};{}'.format(
+                f_slow_k_ma_period, s_conf)
+
+            f_slow_k_ma_type = kwargs.get('slow_k_ma_type')
+            s_conf = 'slow_k_ma_type={:0.0f};{}'.format(
+                f_slow_k_ma_type, s_conf)
+
+            f_slow_d_ma_period = kwargs.get('slow_d_ma_period')
+            s_conf = 'slow_d_ma_period={:0.0f};{}'.format(
+                f_slow_d_ma_period, s_conf)
+
+            f_slow_d_ma_type = kwargs.get('slow_d_ma_type')
+            s_conf = 'slow_d_ma_type={:0.0f};{}'.format(
+                f_slow_d_ma_type, s_conf)
+
+        # define STOCHF conf
+        if s_ta_name == 'STOCHF':
+
+            f_fast_k_ma_period = kwargs.get('fast_k_ma_period')
+            s_conf = 'fast_k_ma_period={:0.0f};{}'.format(
+                f_fast_k_ma_period, s_conf)
+
+            f_fast_d_ma_type = kwargs.get('fast_d_ma_type')
+            s_conf = 'fast_d_ma_type={:0.0f};{}'.format(
+                f_fast_d_ma_type, s_conf)
+
+            f_fast_d_ma_period = kwargs.get('fast_d_ma_period')
+            s_conf = 'fast_d_ma_period={:0.0f};{}'.format(
+                f_fast_d_ma_period, s_conf)
+
+        # define MACD conf
+        if s_ta_name == 'MACD':
+
+            f_fast_ma_period = kwargs.get('fast_ma_period')
+            s_conf = 'fast_ma_period={:0.0f};{}'.format(
+                f_fast_ma_period, s_conf)
+
+            f_fast_ma_type = kwargs.get('fast_ma_type')
+            s_conf = 'fast_ma_type={:0.0f};{}'.format(
+                f_fast_ma_type, s_conf)
+
+            f_slow_ma_type = kwargs.get('slow_ma_type')
+            s_conf = 'slow_ma_type={:0.0f};{}'.format(
+                f_slow_ma_type, s_conf)
+
+            f_slow_ma_period = kwargs.get('slow_ma_period')
+            s_conf = 'slow_ma_period={:0.0f};{}'.format(
+                f_slow_ma_period, s_conf)
+
+            f_signal_ma_type = kwargs.get('signal_ma_type')
+            s_conf = 'signal_ma_type={:0.0f};{}'.format(
+                f_signal_ma_type, s_conf)
+
+            f_signal_ma_period = kwargs.get('signal_ma_period')
+            s_conf = 'signal_ma_period={:0.0f};{}'.format(
+                f_signal_ma_period, s_conf)
+
         # interval is not in the name because it is always the same
         s_name = '{}:{}:' + s_conf
         s_name = s_name.format(s_ta_name, self.s_symbol)

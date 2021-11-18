@@ -71,7 +71,8 @@ class Observation(object):
         if actions:
             agent = actions.owner
         if self.func_features:
-            self.features = self.func_features(env, agent)
+            # self.features = self.func_features(env, agent)
+            self.features = self.func_features(agent)
 
     def append_msg(self, msg, i_steps):
         '''
@@ -929,7 +930,7 @@ class Env(object):
                     i_idx, book_aux = self.get_book_side_idx(s_instr, 'BID')
                     l_updates = []
                     if len(book_aux.last_trades):
-                        l_updates = [UpdateReason.TRADE]
+                        l_updates = [UpdateReason.TRADES]
                     if i_idx != self.book_idx[s_instr]['BID']:
                         self.book_idx[s_instr]['BID'] = i_idx
                         l_updates.append(UpdateReason.BID_SIDE)

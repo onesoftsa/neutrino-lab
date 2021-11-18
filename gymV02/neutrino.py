@@ -12,6 +12,7 @@ from enum import Enum
 import datetime
 import random
 from collections import namedtuple
+import numpy as np
 
 ENV = None
 BOVESPA = False
@@ -113,7 +114,7 @@ class Source(Enum):
 class UpdateReason(Enum):
     BID_SIDE = 0
     ASK_SIDE = 1
-    TRADE = 2
+    TRADES = 2
     EMPTY_BAR = 3
 
     def __eq__(self, o):
@@ -409,6 +410,12 @@ class IndicatorName(Enum):
     BBANDS = 12
     SABBANDS = 13
     STDDEV = 14
+    RSI = 15
+    SAR = 16
+    OBV = 17
+    STOCH = 18
+    STOCHF = 19
+    MACD = 20
 
     def __eq__(self, o):
         if isinstance(o, IndicatorName):
@@ -437,6 +444,9 @@ NextInfo = namedtuple('NextInfo', 'qty timeInForce price side userData')
 BookData = namedtuple('BookData', s_book_info)
 TradeInfo = namedtuple('TradeInfo', s_trade_info)
 SecurityInfo = namedtuple('SecurityInfo', 'priceIncrement minOrderQty')
+
+StatusEntry = namedtuple('StatusEntry', 'status open_trade_time')
+TunnelEntry = namedtuple('StatusEntry', 'low_price high_price')
 
 
 class Transaction(object):
@@ -702,7 +712,7 @@ class BandsRegister(object):
         self.s_name = bar_obj._bar_obj._alias.get(s_alias, None)
         self.properties = IndicatorProperties()
         self._removed = False
-        self.bands = [
+        self.values = [
             IndicatorSelector(self, 0),
             IndicatorSelector(self, 1),
             IndicatorSelector(self, 2)]
@@ -728,7 +738,7 @@ class BandsRegister(object):
             raise NoneObjectError
         if not self.bar_obj.b_ready:
             return 0
-        i_len = len(self.bands[0])
+        i_len = len(self.values[0])
         if i_len == 0:
             return 0
         return (self.bar_obj._bar_data['LST'].count - 1)
@@ -741,19 +751,22 @@ class IndicatorRegister(object):
         self.bar_obj = bar_obj
         self._s_alias = s_alias
         self.i_inner_idx = i_inner_idx
-        self._removed = False
         self.s_name = bar_obj._bar_obj._alias.get(s_alias, None)
+        self.properties = IndicatorProperties()
+        self._removed = False
+
         self._conf = dict(zip(
             ['what', 'symbol', 'conf'], self.s_name.split(':')))
-        self.properties = IndicatorProperties()
-        self.values = IndicatorSelector(self, i_inner_idx)
+
+        # self.values = IndicatorSelector(self, i_inner_idx)
+        self.values = [IndicatorSelector(self, 0)]
 
     def remove_indicator(self):
         # NOTE: it is not working properly
         self._removed = True
         ENV.candles.reset(
             this_candle=self.bar_obj._bar_obj,
-            this_conf=self._conf)
+            this_conf=self._s_alias)  # self._conf)
 
     @property
     def data(self):
@@ -770,7 +783,7 @@ class IndicatorRegister(object):
             raise NoneObjectError
         if not self.bar_obj.b_ready:
             return 0
-        i_len = len(self.values)
+        i_len = len(self.values[0])
         if i_len == 0:
             return 0
         return (self.bar_obj._bar_data['LST'].count - 1)
@@ -806,9 +819,13 @@ class IndicatorSelector(object):
 
     def __getitem__(self, key):
         if isinstance(self.bar_data.data, type(None)):
-            return None
-        obj = self.bar_data.data[self.i_inner_idx][int(key)]
-        return obj
+            return np.nan
+        try:
+            obj = self.bar_data.data[self.i_inner_idx][int(key)]
+            return obj
+        # TODO: I dont know wtf
+        except IndexError:
+            return np.nan
 
 
 class IndicatorProperties(object):
@@ -1181,6 +1198,176 @@ class CandleRegister(object):
         obj_rtn.properties.sa_bar_count = sa_bar_count
         self._indicator_data['SABBANDS'][s_alias] = obj_rtn
         return obj_rtn
+
+    def add_rsi(self, bar_count, source):
+        '''
+
+        bar_count: integer.
+        '''
+        self.b_ready = False
+        if 'RSI' not in self._indicator_data:
+            self._indicator_data['RSI'] = {}
+        s_alias = 'RSI_%i' % (bar_count)
+        ENV.candles.add_indicator_to(
+            this_candle=self._bar_obj,
+            s_alias=s_alias,
+            s_ta_name='RSI',
+            s_input=source.value,
+            i_time_period=bar_count)
+        obj_rtn = IndicatorRegister(self, s_alias)
+        obj_rtn.name = IndicatorName.RSI
+        obj_rtn.properties.bar_count = bar_count
+        obj_rtn.properties.source = source
+        self._indicator_data['RSI'][s_alias] = obj_rtn
+        return obj_rtn
+
+    def add_sar(self, acceleration, maximum):
+        '''
+
+        acceleration: integer.
+        maximum: integer.
+        '''
+        self.b_ready = False
+        bar_count = 0. # not used in this Indicator
+        if 'SAR' not in self._indicator_data:
+            self._indicator_data['SAR'] = {}
+        s_alias = 'SAR_%i' % (bar_count)
+        ENV.candles.add_indicator_to(
+            this_candle=self._bar_obj,
+            s_alias=s_alias,
+            s_ta_name='SAR',
+            acceleration=acceleration,
+            maximum=maximum,
+            i_time_period=bar_count)
+        obj_rtn = IndicatorRegister(self, s_alias)
+        obj_rtn.name = IndicatorName.SAR
+        obj_rtn.properties.acceleration = acceleration
+        obj_rtn.properties.maximum = maximum
+        obj_rtn.properties.bar_count = bar_count
+        self._indicator_data['SAR'][s_alias] = obj_rtn
+        return obj_rtn
+
+    def add_obv(self, source):
+        '''
+
+        bar_count: integer.
+        '''
+        self.b_ready = False
+        bar_count = 0. # not used in this Indicator
+        if 'OBV' not in self._indicator_data:
+            self._indicator_data['OBV'] = {}
+        s_alias = 'OBV_%i' % (bar_count)
+        ENV.candles.add_indicator_to(
+            this_candle=self._bar_obj,
+            s_alias=s_alias,
+            s_ta_name='OBV',
+            s_input=source.value,
+            i_time_period=bar_count)
+        obj_rtn = IndicatorRegister(self, s_alias)
+        obj_rtn.name = IndicatorName.OBV
+        obj_rtn.properties.bar_count = bar_count
+        obj_rtn.properties.source = source
+        self._indicator_data['OBV'][s_alias] = obj_rtn
+        return obj_rtn
+
+    def add_stoch(self, fast_k_ma_period, slow_k_ma_period,
+                  slow_k_ma_type, slow_d_ma_period, slow_d_ma_type):
+        '''
+
+        bar_count: integer.
+        '''
+        self.b_ready = False
+        bar_count = 0. # not used in this Indicator
+        if 'STOCH' not in self._indicator_data:
+            self._indicator_data['STOCH'] = {}
+        s_alias = 'STOCH_%i' % (bar_count)
+        ENV.candles.add_indicator_to(
+            this_candle=self._bar_obj,
+            s_alias=s_alias,
+            s_ta_name='STOCH',
+            i_time_period=bar_count,
+            fast_k_ma_period=fast_k_ma_period,
+            # fast_ma_type=fast_ma_type.value,
+            slow_k_ma_period=slow_k_ma_period,
+            slow_k_ma_type=slow_k_ma_type.value,
+            slow_d_ma_period=slow_d_ma_period,
+            slow_d_ma_type=slow_d_ma_type.value)
+        obj_rtn = BandsRegister(self, s_alias)
+        obj_rtn.name = IndicatorName.STOCH
+        obj_rtn.properties.bar_count = bar_count
+        obj_rtn.properties.fast_k_ma_period = fast_k_ma_period
+        # obj_rtn.properties.fast_ma_type = fast_ma_type
+        obj_rtn.properties.slow_k_ma_period = slow_k_ma_period
+        obj_rtn.properties.slow_k_ma_type = slow_k_ma_type
+        obj_rtn.properties.slow_d_ma_period = slow_d_ma_period
+        obj_rtn.properties.slow_d_ma_type = slow_d_ma_type
+
+        self._indicator_data['STOCH'][s_alias] = obj_rtn
+        return obj_rtn
+
+    def add_stochf(self, fast_k_ma_period, fast_d_ma_period, fast_d_ma_type):
+        '''
+
+        bar_count: integer.
+        '''
+        self.b_ready = False
+        bar_count = 0. # not used in this Indicator
+        if 'STOCHF' not in self._indicator_data:
+            self._indicator_data['STOCHF'] = {}
+        s_alias = 'STOCHF_%i' % (bar_count)
+        ENV.candles.add_indicator_to(
+            this_candle=self._bar_obj,
+            s_alias=s_alias,
+            s_ta_name='STOCHF',
+            i_time_period=bar_count,
+            fast_k_ma_period=fast_k_ma_period,
+            fast_d_ma_period=fast_d_ma_period,
+            fast_d_ma_type=fast_d_ma_type.value)
+        obj_rtn = BandsRegister(self, s_alias)
+        obj_rtn.name = IndicatorName.STOCHF
+        obj_rtn.properties.bar_count = bar_count
+        obj_rtn.properties.fast_k_ma_period = fast_k_ma_period
+        obj_rtn.properties.fast_d_ma_period = fast_d_ma_period
+        obj_rtn.properties.fast_d_ma_type = fast_d_ma_type
+
+        self._indicator_data['STOCHF'][s_alias] = obj_rtn
+        return obj_rtn
+
+    def add_macd(self, fast_ma_type, fast_ma_period, slow_ma_type,
+        slow_ma_period, signal_ma_type, signal_ma_period):
+        '''
+
+        bar_count: integer.
+        '''
+        self.b_ready = False
+        bar_count = 0. # not used in this Indicator
+        if 'MACD' not in self._indicator_data:
+            self._indicator_data['MACD'] = {}
+        s_alias = 'MACD_%i' % (bar_count)
+        ENV.candles.add_indicator_to(
+            this_candle=self._bar_obj,
+            s_alias=s_alias,
+            s_ta_name='MACD',
+            i_time_period=bar_count,
+            fast_ma_period=fast_ma_period,
+            fast_ma_type=fast_ma_type.value,
+            slow_ma_period=slow_ma_period,
+            slow_ma_type=slow_ma_type.value,
+            signal_ma_period=signal_ma_period,
+            signal_ma_type=signal_ma_type.value)
+        obj_rtn = BandsRegister(self, s_alias)
+        obj_rtn.name = IndicatorName.MACD
+        obj_rtn.properties.bar_count = bar_count
+        obj_rtn.properties.fast_ma_period = fast_ma_period
+        obj_rtn.properties.fast_ma_type = fast_ma_type
+        obj_rtn.properties.slow_ma_type = slow_ma_type
+        obj_rtn.properties.slow_ma_period = slow_ma_period
+        obj_rtn.properties.signal_ma_type = signal_ma_type
+        obj_rtn.properties.signal_ma_period = signal_ma_period
+
+        self._indicator_data['MACD'][s_alias] = obj_rtn
+        return obj_rtn
+
 
     @property
     def last_id(self):
@@ -1631,6 +1818,10 @@ class LimitOrderEntry(object):
         return self.order.next.qty
 
     @property
+    def transact_time(self):
+        return 0
+
+    @property
     def last_quantity(self):
         if self.order.current:
             if not isinstance(self.order.current.qty, type(None)):
@@ -1674,6 +1865,35 @@ class LimitOrderEntry(object):
         '''
         '''
         return self.__str__()
+
+
+class SummaryLine(object):
+    def __init__(self, instrumet):
+        self._instr = instrumet
+
+    @property
+    def symbol(self):
+        return self._instr.name
+
+    @property
+    def bid(self):
+        return self._instr.book.bid[0]
+
+    @property
+    def ask(self):
+        return self._instr.book.ask[0]
+
+    @property
+    def last_trade(self):
+        return self._instr.trades[-1]
+
+    @property
+    def stats(self):
+        raise NotImplementedError('Implement SummaryLine.stats')
+
+    @property
+    def status(self):
+        return StatusEntry(self._instr.book.state, '')
 
 
 class PositionData(object):
@@ -1757,7 +1977,7 @@ class PositionStatus(object):
         self.initial = PositionData(intrument, b_init=True)
 
 
-class position(object):
+class Position(object):
 
     @staticmethod
     def get(symbol, i_id=11):
@@ -1767,8 +1987,12 @@ class position(object):
         instr = orders.get_instrument_from(s_symbol=symbol)
         return PositionStatus(instr)
 
+    def __call__(self, obj_agent):
+        # self._current_agent_id = obj_agent._id2env
+        return self
 
-class oms(object):
+
+class Oms(object):
     '''
     Handle orders and keep all trasations related to them
 
@@ -1839,6 +2063,10 @@ class oms(object):
         return oms_client.cancel_all(
             symbol=symbol, side=side, price=price, i_id=i_id)
 
+    def __call__(self, obj_agent):
+        # self._current_agent_id = obj_agent._id2env
+        return self
+
 
 class ScheduledFunction(object):
 
@@ -1850,7 +2078,9 @@ class ScheduledFunction(object):
         self.interval = i_interval
 
 
-class utils(object):
+class Utils(object):
+
+    _this_path = None
 
     @staticmethod
     def every(callback, interval, i_id=11):
@@ -1890,7 +2120,16 @@ class utils(object):
     def by_price(side, depth):
         return byPrice(book_side=side, i_depth=depth)
 
-class market(object):
+    @staticmethod
+    def path():
+        return Utils._this_path
+
+    def __call__(self, obj_agent):
+        # self._current_agent_id = obj_agent._id2env
+        return self
+
+
+class Market(object):
 
     @staticmethod
     def add(symbol, trade_callback='default', book_callback='default',
@@ -1918,12 +2157,34 @@ class market(object):
 
     @staticmethod
     def get_bar(symbol, bar_count, interval):
-        return fx. get_bar(
+        return fx.get_bar(
             symbol=symbol, bar_count=bar_count, interval=interval)
 
     @staticmethod
     def remove_bar(candle_propty):
         return fx.remove_bar(candle_propty=candle_propty)
+
+    @staticmethod
+    def add_summary(symbol, summary_callback='default', i_id=11):
+        obj_aux = fx.add(
+            symbol=symbol,
+            trade_callback=summary_callback,
+            book_callback=None,
+            trade_buffer_size=64,
+            i_id=i_id)
+
+        return SummaryLine(obj_aux)
+
+    @staticmethod
+    def remove_summary(summary_propty, i_id=11):
+        symbol_propty = summary_propty._instr
+        return fx.remove(symbol_propty=symbol_propty, i_id=i_id)
+
+
+
+    def __call__(self, obj_agent):
+        # self._current_agent_id = obj_agent._id2env
+        return self
 
 
 class fx(object):
@@ -2507,3 +2768,21 @@ class fx(object):
 
         def setParameter(self):
             pass
+
+
+'''
+Initialize structures
+'''
+
+# Initiate structure to be used by an agent. It complies to the new neutrino
+#  cluster sintaxe
+
+market = Market()
+utils = Utils()
+oms = Oms()
+position = Position()
+
+
+'''
+End Initialization
+'''

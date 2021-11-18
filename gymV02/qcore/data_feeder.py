@@ -27,6 +27,7 @@ MAP_INPUT = {'pmax': 'na_max',
              'open': 'na_open',
              'close': 'na_close',
              'quantity': 'na_qty',
+             'volume': 'na_volume',
              'quantity_sell': 'na_qtys',
              'quantity_buy': 'na_qtyb',
              'quantity_accumulated': 'na_cumqty',
@@ -219,6 +220,92 @@ def update_STDDEV(**kwargs):
     return np.array([na_rtn])
 
 
+def update_RSI(**kwargs):
+    na_values = kwargs.get('na_close')
+    if 's_input' in kwargs:
+        na_values = kwargs.get(MAP_INPUT[kwargs.get('s_input')])
+    if len(na_values) < 2:
+        return np.array([na_values[0]])
+    na_values = na_values.astype('float64')
+    na_rtn = talib.RSI(
+        na_values,
+        timeperiod=kwargs.get('i_timeperiod'))
+    return np.array([na_rtn])
+
+
+def update_SAR(**kwargs):
+    na_high = kwargs.get('na_max')
+    na_low = kwargs.get('na_min')
+    if len(na_high) < 2:
+        return np.array([na_high[0]])
+    na_high = na_high.astype('float64')
+    na_low = na_low.astype('float64')
+    na_rtn = talib.SAR(
+        high=na_high,
+        low=na_low,
+        acceleration=float(kwargs.get('d_conf').get('acceleration')),
+        maximum=float(kwargs.get('d_conf').get('maximum')))
+    return np.array([na_rtn])
+
+
+def update_OBV(**kwargs):
+    na_values = kwargs.get('na_close')
+    na_volume = kwargs.get('na_volume')
+    if 's_input' in kwargs:
+        na_values = kwargs.get(MAP_INPUT[kwargs.get('s_input')])
+    if len(na_values) < 2:
+        return np.array([na_values[0]])
+    na_values = na_values.astype('float64')
+    na_volume = na_volume.astype('float64')
+    na_rtn = talib.OBV(
+        na_values,
+        na_volume)
+    return np.array([na_rtn])
+
+
+def update_STOCH(**kwargs):
+    na_rtn = talib.STOCH(
+        kwargs.get('na_max'),
+        kwargs.get('na_min'),
+        kwargs.get('na_close'),
+        fastk_period=float(kwargs.get('d_conf').get('fast_k_ma_period')),
+        # fastk_matype=float(kwargs.get('d_conf').get('fast_ma_type')),
+        slowk_period=float(kwargs.get('d_conf').get('slow_k_ma_period')),
+        slowk_matype=float(kwargs.get('d_conf').get('slow_k_ma_type')),
+        slowd_period=float(kwargs.get('d_conf').get('slow_d_ma_period')),
+        slowd_matype=float(kwargs.get('d_conf').get('slow_d_ma_type'))
+        )
+
+    return np.stack(na_rtn)
+
+
+def update_STOCHF(**kwargs):
+    na_rtn = talib.STOCHF(
+        kwargs.get('na_max'),
+        kwargs.get('na_min'),
+        kwargs.get('na_close'),
+        fastk_period=float(kwargs.get('d_conf').get('fast_k_ma_period')),
+        fastd_period=float(kwargs.get('d_conf').get('fast_d_ma_period')),
+        fastd_matype=float(kwargs.get('d_conf').get('fast_d_ma_type'))
+        )
+
+    return np.stack(na_rtn)
+
+
+def update_MACD(**kwargs):
+    na_rtn = talib.MACDEXT(
+        kwargs.get('na_close'),
+        fastperiod=float(kwargs.get('d_conf').get('fast_ma_period')),
+        fastmatype=float(kwargs.get('d_conf').get('fast_ma_type')),
+        slowperiod=float(kwargs.get('d_conf').get('slow_ma_period')),
+        slowmatype=float(kwargs.get('d_conf').get('slow_ma_type')),
+        signalperiod=float(kwargs.get('d_conf').get('signal_ma_period')),
+        signalmatype=float(kwargs.get('d_conf').get('signal_ma_type')),
+        )
+
+    return np.stack(na_rtn)
+
+
 '''
 End help functions
 '''
@@ -236,7 +323,13 @@ TA_UPDATE_MAP = {'SMA': update_SMA,
                  'EMA': update_EMA,
                  'BBANDS': update_BBANDS,
                  'SABBANDS': update_SABBANDS,
-                 'STDDEV': update_STDDEV
+                 'STDDEV': update_STDDEV,
+                 'RSI': update_RSI,
+                 'SAR': update_SAR,
+                 'OBV': update_OBV,
+                 'STOCH': update_STOCH,
+                 'STOCHF': update_STOCHF,
+                 'MACD': update_MACD,
                  }
 
 
@@ -349,6 +442,7 @@ def update_ta(b_update, d_instr_data):
         na_cumqty = np.array(d_instr_data['CUMQTD'].l)
         na_cumqtyb = np.array(d_instr_data['CUMQTD_B'].l)
         na_cumqtys = np.array(d_instr_data['CUMQTD_S'].l)
+        na_volume = np.array(d_instr_data['VOLUME'].l)
 
         for s_this_ta in d_instr_data['INDICATORS']:
             s_ta_key, s_cmm, s_aux = s_this_ta.split(':')
@@ -358,7 +452,8 @@ def update_ta(b_update, d_instr_data):
             # i_time_period = int(l_aux[-1].split('=')[1])
             # s_ta_key = l_aux[0].split(':')[0]
             s_input = None
-            if s_ta_key in ['SMA', 'EMA', 'STDDEV', 'MOM', 'SAMOM']:
+            if s_ta_key in ['SMA', 'EMA', 'STDDEV', 'MOM', 'SAMOM', 'RSI',
+                            'OBV']:
                 s_input = d_conf.get('input', None)
                 if not s_input:
                     s_input = 'close'
@@ -371,6 +466,7 @@ def update_ta(b_update, d_instr_data):
                                              na_cumqty=na_cumqty,
                                              na_cumqtyb=na_cumqtyb,
                                              na_cumqtys=na_cumqtys,
+                                             na_volume=na_volume,
                                              s_input=s_input,
                                              d_conf=d_conf,
                                              i_timeperiod=i_time_period)
@@ -408,8 +504,10 @@ def make_updates(symbol, d_inst_data):
             f_qty = obj_trade.quantity
             i_id = obj_trade.tradeID
             # s = str(obj_trade.time/1000.)
-            s = '{0:09d}'.format(obj_trade.time)
-            s = s[:-3] + '.' + s[-3:]
+            # s = '{0:09d}'.format(obj_trade.time)
+            # s = s[:-3] + '.' + s[-3:]
+            s = '{0:010d}'.format(obj_trade.time)
+            s = s[:-4] + '.' + s[-4:]
             if s_agr not in ['+', '-', 'X'] or i_id <= last_trade_id:
                 continue
             inst_data['ID'] = i_id
@@ -425,14 +523,18 @@ def make_updates(symbol, d_inst_data):
         # ensure that the candle data is updated at least one time per 10 secds
         if not b_update and (f_mkt_time - LAST_TIME) >= 10:  # not correct
             LAST_TIME = f_mkt_time
+            # s = fx.now(True)
+            # s = s.split(' ')[1]
+            # f_time2 = float(s[:2])*60**2+float(s[3:5])*60 + float(s[6:])
+            f_time2 = f_mkt_time
             # print 'make_updates(): try to update by time', fx.now(True)
-            inst_data, b_update = update_prices(inst_data, None, f_mkt_time)
-            inst_data, b_update2 = update_qty(inst_data, None, f_mkt_time, 'X')
-            inst_data = update_volume(inst_data, None, f_mkt_time)
+            inst_data, b_update = update_prices(inst_data, None, f_time2)
+            inst_data, b_update2 = update_qty(inst_data, None, f_time2, 'X')
+            inst_data = update_volume(inst_data, None, f_time2)
             b_update = b_update or b_update2
             d_update[s_name] = b_update
             f_last_time = inst_data['LST'].last_time
-            inst_data = update_ts(inst_data, f_last_time, f_mkt_time)
+            inst_data = update_ts(inst_data, f_last_time, f_time2)
             inst_data = update_ta(b_update, inst_data)
 
     # print inst_data

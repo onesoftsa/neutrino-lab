@@ -1,24 +1,26 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-The __init__.py files are required to make Python treat the directories as
-containing packages; this is done to prevent directories with a common name,
-such as string, from unintentionally hiding valid modules that occur later
-(deeper) on the module search path.
+...
 
 @author: ucaiado
 
-Created on 09/05/2017
+Created on 01/25/2018
 """
-# from .dummy_agent import DummyAgent
+from .DemoBook import DemoBook
+from .DemoTrades import DemoTrades
+from .DemoCallbacks import DemoCallbacks
+from .DemoCandles import DemoCandles
+from .DemoSummary import DemoSummary
+from .DemoScheduler import DemoScheduler
+from .DemoDummy import DemoDummy
+from .DemoOrders import DemoOrders
 
-
-
-
-
-from .print_candles import PrintCandles
-from .print_trades import PrintTrades
-from .send_orders import SendOrders
-from .test_notify import TestNotify
-from .scheduler_test import SchedulerTest
-
+__all__ = [
+    'DemoScheduler',
+    'DemoCandles',
+    'DemoCallbacks',
+    'DemoTrades',
+    'DemoBook',
+    'DemoDummy',
+    'DemoOrders']

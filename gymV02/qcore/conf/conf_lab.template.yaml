@@ -1,0 +1,19 @@
+NEUTRINO_LAB:
+  Darwin:
+  Linux:  /path/to/neutrino-lab
+  Windows:
+DATA_FOLDER:
+  Darwin:
+  Linux: /path/to/data-folder/
+  Windows:
+EASYREPLAY:
+  Darwin:
+  Linux: /path/to/easyreplay
+  Windows:
+LOGS:
+  Darwin:
+  Linux: /path/to/logfolder
+  Windows:
+ENV:
+  Prod: false
+  Verb: false
